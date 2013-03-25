@@ -18,6 +18,9 @@
 # MA  02110-1301, USA.                                              #
 #####################################################################
 
+# Time between synced task updates. 20 ms
+DELTA_TIME = 20 
+
 class TaskEngine(object):
     def __init__(self, engine):
         
@@ -30,9 +33,7 @@ class TaskEngine(object):
         self.tasks = []
         self.currentTask = None
         
-        self.deltaTime = 20 # Time between synced task updates. 20 ms
         self.timeAccumulator = 0
-        
     
     def checkTask(self, task):
         ''' Check if a task exists '''
@@ -89,14 +90,14 @@ class TaskEngine(object):
         self.timeAccumulator += self.clock.get_time()
         
         # Synced tasks
-        while self.timeAccumulator >= self.deltaTime:
+        while self.timeAccumulator >= DELTA_TIME:
             for taskData in self.tasks:
                 if taskData['paused'] or not taskData['synced']:
                     continue
                 
-                self.runTask(taskData['task'], tick=self.deltaTime)
+                self.runTask(taskData['task'], tick=DELTA_TIME)
         
-            self.timeAccumulator -= self.deltaTime
+            self.timeAccumulator -= DELTA_TIME
         
         # Unsynced tasks
         for taskData in self.tasks:
