@@ -19,9 +19,8 @@
 #####################################################################
 
 class TaskEngine(object):
-    def __init__(self, config, engine):
+    def __init__(self, engine):
         
-        self.config = config
         self.engine = engine
         
         self.clock = self.engine.clock
@@ -32,7 +31,6 @@ class TaskEngine(object):
         self.currentTask = None
         
         self.deltaTime = 25 # Time between synced task updates. 25 ms
-        self.time = 0
         self.timeAccumulator = 0
         
     
@@ -99,7 +97,6 @@ class TaskEngine(object):
                 self.runTask(taskData['task'], tick=self.deltaTime)
         
             self.timeAccumulator -= self.deltaTime
-            self.time += self.deltaTime
         
         # Unsynced tasks
         for taskData in self.tasks:

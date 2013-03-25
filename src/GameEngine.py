@@ -189,7 +189,7 @@ class GameEngine(object):
         self.fps = fps
         self.running = True
         self.clock = pygame.time.Clock()
-        self.task = TaskEngine(config, self)
+        self.task = TaskEngine(self)
         
         # Compatiblity task management
         self.addTask = self.task.addTask
