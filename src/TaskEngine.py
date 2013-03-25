@@ -31,6 +31,10 @@ class TaskEngine(object):
         self.tasks = []
         self.currentTask = None
         
+        self.deltaTime = 25 # Time between synced task updates. 25 ms
+        self.time = 0
+        self.timeAccumulator = 0
+        
     
     def checkTask(self, task):
         ''' Check if a task exists '''
@@ -86,12 +90,19 @@ class TaskEngine(object):
         self.clock.tick(self.engine.fps)
         tick = self.clock.get_time()
         
+        self.timeAccumulator += tick
+        
         # Synced tasks
-        for taskData in self.tasks:
-            if taskData['paused'] or not taskData['synced']:
-                continue
-            
-            self.runTask(taskData['task'], tick=tick)
+        while self.timeAccumulator >= self.deltaTime:
+            for taskData in self.tasks:
+                if taskData['paused'] or not taskData['synced']:
+                    continue
+                
+                self.runTask(taskData['task'], tick=tick)
+        
+            self.timeAccumulator -= self.deltaTime
+            self.time += self.deltaTime
+        
         # Unsynced tasks
         for taskData in self.tasks:
             if taskData['paused']or taskData['synced']:
