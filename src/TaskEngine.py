@@ -30,7 +30,7 @@ class TaskEngine(object):
         self.tasks = []
         self.currentTask = None
         
-        self.deltaTime = 25 # Time between synced task updates. 25 ms
+        self.deltaTime = 20 # Time between synced task updates. 20 ms
         self.timeAccumulator = 0
         
     
