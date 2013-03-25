@@ -88,9 +88,7 @@ class TaskEngine(object):
             return False
         
         self.clock.tick(self.engine.fps)
-        tick = self.clock.get_time()
-        
-        self.timeAccumulator += tick
+        self.timeAccumulator += self.clock.get_time()
         
         # Synced tasks
         while self.timeAccumulator >= self.deltaTime:
@@ -98,7 +96,7 @@ class TaskEngine(object):
                 if taskData['paused'] or not taskData['synced']:
                     continue
                 
-                self.runTask(taskData['task'], tick=tick)
+                self.runTask(taskData['task'], tick=self.deltaTime)
         
             self.timeAccumulator -= self.deltaTime
             self.time += self.deltaTime
