@@ -59,6 +59,7 @@ import Mod
 import Player
 from Shader import shaders
 from constants import *
+from TaskEngine import TaskEngine
 
 import cmgl
 
@@ -185,14 +186,16 @@ class GameEngine(object):
         self.config  = config
 
         fps          = self.config.get("video", "fps")
-
-        self.tasks = []
-        self.frameTasks = []
         self.fps = fps
-        self.currentTask = None
-        self.paused = []
         self.running = True
         self.clock = pygame.time.Clock()
+        self.task = TaskEngine(config, self)
+        
+        # Compatiblity task management
+        self.addTask = self.task.addTask
+        self.removeTask = self.task.removeTask
+        self.pauseTask = self.task.pauseTask
+        self.resumeTask = self.task.resumeTask
 
         self.title             = self.versionString
         self.restartRequested  = False
@@ -291,11 +294,11 @@ class GameEngine(object):
 
         # Load game modifications
         Mod.init(self)
-        self.addTask(self.input, synchronized = False)
+        self.task.addTask(self.input, synced = False)
 
-        self.addTask(self.view, synchronized = False)
+        self.task.addTask(self.view, synced = False)
 
-        self.addTask(self.resource, synchronized = False)
+        self.task.addTask(self.resource, synced = False)
 
         self.data = Data(self.resource, self.svg)
 
@@ -362,7 +365,7 @@ class GameEngine(object):
         except ImportError:
             self.theme = Theme(themepath, themename)
 
-        self.addTask(self.theme)
+        self.task.addTask(self.theme)
 
 
         self.input.addKeyListener(FullScreenSwitcher(self), priority = True)
@@ -382,8 +385,8 @@ class GameEngine(object):
         if not self.restartRequested:
             self.audio.close()
         Player.savePlayers()
-        for t in list(self.tasks + self.frameTasks):
-            self.removeTask(t)
+        for taskData in list(self.task.tasks):
+            self.task.removeTask(taskData['task'])
         self.running = False
 
     def setStartupLayer(self, startupLayer):
@@ -624,6 +627,7 @@ class GameEngine(object):
 
         if alpha == True:
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+    
     #glorandwarf: renamed to retrieve the path of the file
     def fileExists(self, fileName):
         return self.data.fileExists(fileName)
@@ -633,7 +637,7 @@ class GameEngine(object):
 
     def loading(self):
         """Loading state loop."""
-        done = self.doRun()
+        done = self.task.run()
         self.clearScreen()
 
         if self.data.essentialResourcesLoaded():
@@ -671,60 +675,6 @@ class GameEngine(object):
         glVertex2f(1, 1)
         glEnd()
 
-    def addTask(self, task, synchronized = True):
-        """
-        Add a task to the engine.
-
-        @param task:          L{Task} to add
-        @type  synchronized:  bool
-        @param synchronized:  If True, the task will be run with small
-                              timesteps tied to the engine clock.
-                              Otherwise the task will be run once per frame.
-        """
-        if synchronized:
-            queue = self.tasks
-        else:
-            queue = self.frameTasks
-
-        if not task in queue:
-            queue.append(task)
-            task.started()
-
-    def removeTask(self, task):
-        """
-        Remove a task from the engine.
-
-        @param task:    L{Task} to remove
-        """
-        queues = self._getTaskQueues(task)
-        for q in queues:
-            q.remove(task)
-        if queues:
-            task.stopped()
-
-    def _getTaskQueues(self, task):
-        queues = []
-        for queue in [self.tasks, self.frameTasks]:
-            if task in queue:
-                queues.append(queue)
-        return queues
-
-    def pauseTask(self, task):
-        """
-        Pause a task.
-
-        @param task:  L{Task} to pause
-        """
-        self.paused.append(task)
-
-    def resumeTask(self, task):
-        """
-        Resume a paused task.
-
-        @param task:  L{Task} to resume
-        """
-        self.paused.remove(task)
-
     def enableGarbageCollection(self, enabled):
         """
         Enable or disable garbage collection whenever a random garbage
@@ -742,20 +692,15 @@ class GameEngine(object):
         """
         gc.collect()
 
-    def _runTask(self, task, ticks = 0):
-        if not task in self.paused:
-            self.currentTask = task
-            task.run(ticks)
-            self.currentTask = None
-
     def main(self):
         """Main state loop."""
-        done = self.doRun()
+        done = self.task.run()
         self.clearScreen()
         self.view.render()
         if self.debugLayer:
             self.debugLayer.render(1.0, True)
         self.video.flip()
+        
         # evilynux - Estimate the rendered frames per second.
         self.frames = self.frames+1
         # Estimate every 120 frames when highpriority is True.
@@ -767,20 +712,8 @@ class GameEngine(object):
             if self.show_fps and not Version.isWindowsExe():
                 print("%.2f fps" % self.fpsEstimate)
             self.frames = 0
+        
         return done
-
-    def doRun(self):
-        """Run one cycle of the task scheduler engine."""
-        if not self.frameTasks and not self.tasks:
-            return False
-
-        for task in self.frameTasks:
-            self._runTask(task)
-        tick = self.clock.get_time()
-        for task in self.tasks:
-            self._runTask(task, tick)
-        self.clock.tick(self.fps)
-        return True
 
     def run(self):
         return self.mainloop()
