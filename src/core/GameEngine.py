@@ -44,6 +44,7 @@ from views.View import View
 from core.Input import Input, KeyListener, SystemEventListener
 from core.Resource import Resource
 from core.Data import Data
+from core.TaskEngine import TaskEngine
 from game.World import World
 from graphics.Image import SvgContext, ImgDrawing
 #alarian
@@ -59,7 +60,6 @@ from configuration import Mod
 from game import Player
 from graphics.Shader import shaders
 from constants import *
-from TaskEngine import TaskEngine
 
 from graphics import cmgl
 
