@@ -27,13 +27,11 @@ from ConfigParser import RawConfigParser
 import Log
 import Resource
 import os
+from Unicode import utf8, unicodify
 
-encoding  = "iso-8859-1"
 config    = None
 prototype = {}
 
-logIniReads = 0   #MFH - INI reads disabled by default during the startup period
-logUndefinedGets = 0
 
 class MyConfigParser(RawConfigParser):
     def _writeSection(self, fp, sectionName, sectionItems):
@@ -60,6 +58,14 @@ class MyConfigParser(RawConfigParser):
     def writePlayer(self, fp):
         if self.has_section('player'):
             self._writeSection(fp, 'player', self.items('player'))
+
+    def get(self, section, option):
+        return unicodify(RawConfigParser.get(self, section, option))
+
+    def set(self, section, option, value=None):
+        if value is not None:
+            value = utf8(value)
+        RawConfigParser.set(self, section, option, value)
 
 class Option:
     """A prototype configuration key."""
@@ -91,13 +97,34 @@ def define(section, option, type, default = None, text = None, options = None, p
 
 def load(fileName = None, setAsDefault = False, type = 0):
     """Load a configuration with the default prototype"""
-    global config, logIniReads, logUndefinedGets
+    global config
     c = Config(prototype, fileName, type)
     if setAsDefault and not config:
         config = c
-    logIniReads = c.get("game", "log_ini_reads")
-    logUndefinedGets = c.get("game", "log_undefined_gets")
     return c
+
+def _convertValue(value, type, default=False):
+    """
+    Convert a raw config string to the proper data type.
+    @param value: the raw value
+    @param type:  the desired type
+    @return:      the converted value
+    """
+    if type is bool:
+        value = str(value).lower()
+        if value in ("1", "true", "yes", "on"):
+            return True
+        elif value in ("none", ""):
+            return default #allows None-default bools to return None
+        else:
+            return False
+    elif issubclass(type, basestring):
+        return unicodify(value)
+    else:
+        try:
+            return type(value)
+        except:
+            return None
 
 class Config:
     """A configuration registry."""
@@ -139,34 +166,15 @@ class Config:
         @return:          Key value
         """
 
-        global logIniReads, logUndefinedGets
-
         try:
             type    = self.prototype[section][option].type
             default = self.prototype[section][option].default
         except KeyError:
-            if logUndefinedGets == 1:
-                Log.warn("Config key %s.%s not defined while reading %s." % (section, option, self.fileName))
-            type, default = str, None
+            Log.error("Config key %s.%s not defined while reading %s." % (section, option, self.fileName))
+            raise
 
-        value = self.config.has_option(section, option) and self.config.get(section, option) or default
-        if type == bool:
-            value = str(value).lower()
-            if value in ("1", "true", "yes", "on"):
-                value = True
-            elif value in ("none", ""):
-                value = default #allows None-default bools to return None
-            else:
-                value = False
-        else:
-            try:
-                value = type(value)
-            except:
-                value = None
+        value = _convertValue(self.config.get(section, option) if self.config.has_option(section, option) else default, type, default)
 
-        #myfingershurt: verbose log output
-        if logIniReads == 1:
-            Log.debug("Config.get: %s.%s = %s" % (section, option, value))
         return value
 
     def getOptions(self, section, option):
@@ -177,39 +185,22 @@ class Config:
         @param option:    Option name
         @return:          Tuple of Key list and Values list
         """
-        global logIniReads, logUndefinedGets
-
 
         try:
             options = self.prototype[section][option].options.values()
             keys    = self.prototype[section][option].options.keys()
             type    = self.prototype[section][option].type
         except KeyError:
-            if logUndefinedGets == 1:
-                Log.warn("Config key %s.%s not defined while reading %s." % (section, option, self.fileName))
-            type = None
+            Log.error("Config key %s.%s not defined while reading %s." % (section, option, self.fileName))
+            raise
 
         optionList = []
 
         if type != None:
             for i in range(len(options)):
-                value = keys[i]
-                if type == bool:
-                    value = str(value).lower()
-                    if value in ("1", "true", "yes", "on"):
-                        value = True
-                    else:
-                        value = False
-                else:
-                    try:
-                        value = type(value)
-                    except:
-                        value = None
+                value = _convertValue(keys[i], type)
                 optionList.append(value)
 
-        #myfingershurt: verbose log output
-        if logIniReads == 1:
-            Log.debug("Config.getOptions: %s.%s = %s" % (section, option, str(optionList)))
         return optionList, options
 
     def getTipText(self, section, option):
@@ -221,18 +212,12 @@ class Config:
         @return:          Tip Text String
         """
 
-        global logIniReads, logUndefinedGets
-
         try:
             text = self.prototype[section][option].tipText
         except KeyError:
-            if logUndefinedGets == 1:
-                Log.warn("Config key %s.%s not defined while reading %s." % (section, option, self.fileName))
-            text = None
+            Log.error("Config key %s.%s not defined while reading %s." % (section, option, self.fileName))
+            raise
 
-        #myfingershurt: verbose log output
-        if logIniReads == 1:
-            Log.debug("Config.getTipText: %s.%s = %s" % (section, option, text))
         return text
 
     def getDefault(self, section, option):
@@ -243,33 +228,16 @@ class Config:
         @param option:    Option name
         @return:          Key value
         """
-        global logIniReads, logUndefinedGets
-
 
         try:
             type    = self.prototype[section][option].type
             default = self.prototype[section][option].default
         except KeyError:
-            if logUndefinedGets == 1:
-                Log.warn("Config key %s.%s not defined while reading %s." % (section, option, self.fileName))
-            type, default = str, None
+            Log.error("Config key %s.%s not defined while reading %s." % (section, option, self.fileName))
+            raise
 
-        value = default
-        if type == bool:
-            value = str(value).lower()
-            if value in ("1", "true", "yes", "on"):
-                value = True
-            else:
-                value = False
-        else:
-            try:
-                value = type(value)
-            except:
-                value = None
+        value = _convertValue(default, type)
 
-        #myfingershurt: verbose log output
-        if logIniReads == 1:
-            Log.debug("Config.getDefault: %s.%s = %s" % (section, option, value))
         return value
 
     def set(self, section, option, value):
@@ -281,23 +249,16 @@ class Config:
         @param value:     Value name
         """
 
-        global logUndefinedGets
-
         try:
             prototype[section][option]
         except KeyError:
-            if logUndefinedGets == 1:
-                Log.warn("Config key %s.%s not defined while writing %s." % (section, option, self.fileName))
+            Log.error("Config key %s.%s not defined while writing %s." % (section, option, self.fileName))
+            raise
 
         if not self.config.has_section(section):
             self.config.add_section(section)
 
-        if type(value) == unicode:
-            value = value.encode(encoding)
-        else:
-            value = str(value)
-
-        self.config.set(section, option, value)
+        self.config.set(section, option, utf8(value))
 
         f = open(self.fileName, "w")
         self.config.write(f, self.type)

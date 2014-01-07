@@ -28,7 +28,7 @@ assert_binary_on_path () {
 }
 
 if test -z "$CROSS_TOOL_PREFIX"; then
-  export CROSS_TOOL_PREFIX=i586-mingw32msvc
+  export CROSS_TOOL_PREFIX=i686-w64-mingw32
 fi
 echo "Using cross compilers prefixed with '$CROSS_TOOL_PREFIX-'."
 echo "(Set CROSS_TOOL_PREFIX to change this; don't include the trailing hyphen.)"
@@ -57,14 +57,18 @@ fi
 echo "wine: $WINE"
 
 assert_binary_on_path autoreconf
+assert_binary_on_path bzip2
+assert_binary_on_path gzip
 assert_binary_on_path libtoolize
 assert_binary_on_path make
+assert_binary_on_path patch
 assert_binary_on_path pkg-config
 assert_binary_on_path python
-assert_binary_on_path svn
 assert_binary_on_path tar
 assert_binary_on_path unzip
 assert_binary_on_path wget
+assert_binary_on_path xz
+assert_binary_on_path yasm
 
 SCRIPTDIR="`pwd`"
 export PREFIX="`pwd`"/deps
@@ -98,6 +102,31 @@ chmod 0755 "$1"
 EOF
 chmod 0755 $PREFIX/bin/wine-shwrap
 
+echo 'creating compiler wrappers'
+cat >"$PREFIX"/bin/"$CROSS_GCC" <<"EOF"
+#!/usr/bin/python
+import sys, os
+STATIC_LIBS = ['-lstdc++', '-lgcc', '-lgcc_eh']
+def fixed_args(args):
+    for n, arg in enumerate(args):
+        if arg in STATIC_LIBS:
+            yield '-Wl,-Bstatic'
+        yield arg
+        if arg in STATIC_LIBS:
+            yield '-Wl,--exclude-libs,lib%s.a,-Bdynamic' % arg[2:]
+        if n == 0:
+            yield '-static-libgcc'
+            yield '-static-libstdc++'
+            yield '-mpreferred-stack-boundary=2'
+            yield '-mincoming-stack-boundary=2'
+for p in os.environ['PATH'].split(os.pathsep):
+    candidate = os.path.join(p, os.path.basename(__file__))
+    if os.access(candidate, os.X_OK) and not os.path.samefile(candidate, __file__):
+        os.execv(candidate, list(fixed_args(sys.argv)))
+EOF
+chmod -v 0755 "$PREFIX"/bin/"$CROSS_GCC"
+ln -svf "$CROSS_GCC" "$PREFIX"/bin/"$CROSS_GXX"
+
 export PATH="$PREFIX"/bin:"$PATH"
 
 download () {
@@ -106,30 +135,32 @@ download () {
     wget -c -O "$basename".part "$1"
     mv -v "$basename".part "$basename"
   fi
+  test -f "$PREFIX"/URLs && cp -f "$PREFIX"/URLs "$PREFIX"/URLs.new
+  echo "$1" >>"$PREFIX"/URLs.new
+  sort "$PREFIX"/URLs.new | uniq >"$PREFIX"/URLs
+  rm -f "$PREFIX"/URLs.new
 }
 
 # We use win-iconv instead of full-fledged GNU libiconv because it still does
 # everything the other deps need and is far smaller.
-WINICONV="win-iconv-0.0.2"
+WINICONV="win-iconv-0.0.6"
 if test ! -f "$PREFIX"/build-stamps/win-iconv; then
   download http://win-iconv.googlecode.com/files/$WINICONV.tar.bz2
   tar jxvf $WINICONV.tar.bz2
   cd $WINICONV
-  make clean
-  make -n iconv.dll win_iconv.exe | sed -e 's/^/$CROSS_TOOL_PREFIX-/' | sh -ex
-  $CROSS_GCC -mdll -o iconv.dll -Wl,--out-implib,libiconv.a iconv.def win_iconv.o
-  cp -v iconv.dll win_iconv.exe "$PREFIX"/bin
+  make CC="$CROSS_GCC" iconv.dll
+  cp -v iconv.dll "$PREFIX"/bin
   cp -v iconv.h "$PREFIX"/include
   echo '' >>"$PREFIX"/include/iconv.h  # squelch warnings about no newline at the end
   sed -i -e 's://.*$::' "$PREFIX"/include/iconv.h  # squelch warnings about C++ comments
-  cp -v libiconv.a "$PREFIX"/lib
+  cp -v libiconv.dll.a "$PREFIX"/lib
   cd ..
   touch "$PREFIX"/build-stamps/win-iconv
   $RM_RF $WINICONV
 fi
 
 # zlib
-ZLIB="zlib-1.2.5"
+ZLIB="zlib-1.2.7"
 if test ! -f "$PREFIX"/build-stamps/zlib; then
   download http://www.zlib.net/$ZLIB.tar.bz2
   tar jxvf $ZLIB.tar.bz2
@@ -137,7 +168,7 @@ if test ! -f "$PREFIX"/build-stamps/zlib; then
   make -f win32/Makefile.gcc PREFIX="$CROSS_TOOL_PREFIX"- zlib1.dll
   cp -v zlib.h zconf.h "$PREFIX"/include
   cp -v zlib1.dll "$PREFIX"/bin
-  cp -v libzdll.a "$PREFIX"/lib/libz.a
+  cp -v libz.dll.a "$PREFIX"/lib
   cd ..
   touch "$PREFIX"/build-stamps/zlib
   $RM_RF $ZLIB
@@ -146,8 +177,39 @@ fi
 # Flags passed to every dependency's ./configure script, for those deps that use autoconf and friends.
 COMMON_AUTOCONF_FLAGS="--prefix=$PREFIX --host=$CROSS_TOOL_PREFIX --disable-static --enable-shared CPPFLAGS=-I$PREFIX/include LDFLAGS=-L$PREFIX/lib"
 
+# libpng
+LIBPNG="libpng-1.5.14"
+if test ! -f "$PREFIX"/build-stamps/libpng; then
+  download http://download.sourceforge.net/libpng/$LIBPNG.tar.xz
+  tar Jxvf $LIBPNG.tar.xz
+  cd $LIBPNG
+  ./configure $COMMON_AUTOCONF_FLAGS
+  make
+  make install
+  cd ..
+  touch "$PREFIX"/build-stamps/libpng
+  $RM_RF $LIBPNG
+fi
+
+# libjpeg
+LIBJPEG="jpegsrc.v9"
+if test ! -f "$PREFIX"/build-stamps/libjpeg; then
+  download http://www.ijg.org/files/$LIBJPEG.tar.gz
+  tar zxvf $LIBJPEG.tar.gz
+  cd jpeg-9
+  ./configure $COMMON_AUTOCONF_FLAGS
+  make
+  make install
+  cd ..
+  touch "$PREFIX"/build-stamps/libjpeg
+  $RM_RF jpeg-9
+fi
+
 # Runtime (libintl) of GNU Gettext
-GETTEXT="gettext-0.18.1.1"
+# We build the rest later, after certain libraries are in place, to save
+# space as the tools can link to those libraries rather than use gettext's
+# internal copy. But some of those libs use libintl themselves, so...
+GETTEXT="gettext-0.18.2"
 if test ! -f "$PREFIX"/build-stamps/gettext-runtime; then
   download http://ftp.gnu.org/gnu/gettext/$GETTEXT.tar.gz
   tar zxvf $GETTEXT.tar.gz
@@ -160,26 +222,41 @@ if test ! -f "$PREFIX"/build-stamps/gettext-runtime; then
   $RM_RF $GETTEXT
 fi
 
-# GLib
-GLIB="glib-2.26.1"
-if test ! -f "$PREFIX"/build-stamps/glib; then
-  download http://ftp.gnome.org/pub/GNOME/sources/glib/2.26/$GLIB.tar.bz2
-  tar jxvf $GLIB.tar.bz2
-  cd $GLIB
-  ./configure $COMMON_AUTOCONF_FLAGS
-  make -C glib
-  make -C gthread
-  make -C gobject glib-genmarshal.exe
-  wine-shwrap gobject/glib-genmarshal
+# We don't really need this, but GObject requires it.
+# Not that we're using GObject or anything, but glib's configure script
+# refuses to run without it and this is the path of least resistance.
+LIBFFI="libffi-3.0.12"
+if test ! -f "$PREFIX"/build-stamps/libffi; then
+  download ftp://sourceware.org/pub/libffi/$LIBFFI.tar.gz
+  tar zxvf $LIBFFI.tar.gz
+  cd $LIBFFI
+  ./configure $COMMON_AUTOCONF_FLAGS --enable-portable-binary
   make
   make install
+  cd ..
+  touch "$PREFIX"/build-stamps/libffi
+  $RM_RF $LIBFFI
+fi
+
+# GLib
+GLIB="glib-2.34.3"
+if test ! -f "$PREFIX"/build-stamps/glib; then
+  download http://ftp.gnome.org/pub/GNOME/sources/glib/2.34/$GLIB.tar.xz
+  tar Jxvf $GLIB.tar.xz
+  cd $GLIB
+  ./configure $COMMON_AUTOCONF_FLAGS --disable-modular-tests
+  make -C glib
+  make -C gthread
+  make -C glib install
+  make -C gthread install
+  cp -v glib-2.0.pc gthread-2.0.pc "$PREFIX"/lib/pkgconfig
   cd ..
   touch "$PREFIX"/build-stamps/glib
   $RM_RF $GLIB
 fi
 
 # pkg-config
-PKGCONFIG="pkg-config-0.25"
+PKGCONFIG="pkg-config-0.28"
 if test ! -f "$PREFIX"/build-stamps/pkg-config; then
   download http://pkgconfig.freedesktop.org/releases/$PKGCONFIG.tar.gz
   tar zxvf $PKGCONFIG.tar.gz
@@ -193,11 +270,14 @@ if test ! -f "$PREFIX"/build-stamps/pkg-config; then
 fi
 
 # The rest of GNU Gettext
+# See the note on the runtime for why we split the
+# build like this. If libunistring, libxml2, or libcroco
+# are ever added, we should do this after them.
 if test ! -f "$PREFIX"/build-stamps/gettext; then
   download http://ftp.gnu.org/gnu/gettext/$GETTEXT.tar.gz
   tar zxvf $GETTEXT.tar.gz
   cd $GETTEXT
-  ./configure $COMMON_AUTOCONF_FLAGS --enable-relocatable --disable-libasprintf --disable-java --disable-csharp CXX="$CROSS_GXX"
+  ./configure $COMMON_AUTOCONF_FLAGS --enable-relocatable --disable-libasprintf --disable-java --disable-csharp
   make
   make install
   cd ..
@@ -206,13 +286,11 @@ if test ! -f "$PREFIX"/build-stamps/gettext; then
 fi
 
 # libogg
-LIBOGG="libogg-1.2.1"
+LIBOGG="libogg-1.3.0"
 if test ! -f "$PREFIX"/build-stamps/libogg; then
-  download http://downloads.xiph.org/releases/ogg/$LIBOGG.tar.gz
-  tar zxvf $LIBOGG.tar.gz
+  download http://downloads.xiph.org/releases/ogg/$LIBOGG.tar.xz
+  tar Jxvf $LIBOGG.tar.xz
   cd $LIBOGG
-  libtoolize
-  autoreconf  # fix buggy configure test for 16-bit types
   ./configure $COMMON_AUTOCONF_FLAGS
   make
   make install
@@ -222,10 +300,10 @@ if test ! -f "$PREFIX"/build-stamps/libogg; then
 fi
 
 # libvorbis
-LIBVORBIS="libvorbis-1.3.2"
+LIBVORBIS="libvorbis-1.3.3"
 if test ! -f "$PREFIX"/build-stamps/libvorbis; then
-  download http://downloads.xiph.org/releases/vorbis/$LIBVORBIS.tar.bz2
-  tar jxvf $LIBVORBIS.tar.bz2
+  download http://downloads.xiph.org/releases/vorbis/$LIBVORBIS.tar.xz
+  tar Jxvf $LIBVORBIS.tar.xz
   cd $LIBVORBIS
   ./configure $COMMON_AUTOCONF_FLAGS
   make
@@ -236,10 +314,10 @@ if test ! -f "$PREFIX"/build-stamps/libvorbis; then
 fi
 
 # libtheora
-LIBTHEORA="libtheora-1.1.1"
+LIBTHEORA="libtheora-1.2.0alpha1"
 if test ! -f "$PREFIX"/build-stamps/libtheora; then
-  download http://downloads.xiph.org/releases/theora/$LIBTHEORA.tar.bz2
-  tar jxvf $LIBTHEORA.tar.bz2
+  download http://downloads.xiph.org/releases/theora/$LIBTHEORA.tar.xz
+  tar Jxvf $LIBTHEORA.tar.xz
   cd $LIBTHEORA
   ./configure $COMMON_AUTOCONF_FLAGS
   make
@@ -249,32 +327,187 @@ if test ! -f "$PREFIX"/build-stamps/libtheora; then
   $RM_RF $LIBTHEORA
 fi
 
-# ffmpeg
-# We only need libswscale.
-if test ! -f "$PREFIX"/build-stamps/ffmpeg; then
-  if test ! -d ffmpeg; then
-    svn co svn://svn.ffmpeg.org/ffmpeg/trunk ffmpeg
-  else
-    svn up ffmpeg
-  fi
-  cd ffmpeg
-  ./configure --prefix="$PREFIX" --cc="$CROSS_GCC" --nm="$CROSS_NM" --target-os=mingw32 --arch=i386 --disable-static --enable-shared --enable-gpl --enable-runtime-cpudetect --enable-memalign-hack --disable-everything --disable-ffmpeg --disable-ffplay --disable-ffserver --disable-ffprobe --disable-avdevice --disable-avcodec --disable-avcore --disable-avformat --disable-avfilter
-  sed -i -e 's/-Werror=[^ ]*//g' config.mak
+# FLAC
+FLAC="flac-1.2.1"
+if test ! -f "$PREFIX"/build-stamps/flac; then
+  download http://downloads.xiph.org/releases/flac/$FLAC.tar.gz
+  tar zxvf $FLAC.tar.gz
+  cd $FLAC
+  patch -Np1 -i ../flac-mingw-dll.patch
+  sed -i -e 's/AM_PATH_XMMS/true; dnl &/' configure.in
+  autoreconf -fiv
+  # Exclude the C++ stuff because we don't use it and it sometimes has build issues.
+  ./configure $COMMON_AUTOCONF_FLAGS --disable-cpplibs
   make
   make install
-  for lib in avutil swscale; do
-    # FFmpeg symlinks its DLLs to a few different names, differing in the level
-    # of detail of their version number, rather like what is done with ELF shared
-    # libraries.  Unfortunately, the real DLL for each one is *not* the one that
-    # the implibs reference (that is, the one that will be required at runtime),
-    # so we must rename it after we nuke the symlinks.
-    find "$PREFIX"/bin -type l -name "${lib}*.dll" -print0 | xargs -0 rm -f
-    libfile="`find "$PREFIX"/bin -name "${lib}*.dll" | sed -e 1q`"
-    mv -v "$libfile" "`echo "$libfile" | sed -e "s/\($lib-[0-9]*\)[.0-9]*\.dll/\1.dll/"`"
-  done
+  cd ..
+  touch "$PREFIX"/build-stamps/flac
+  $RM_RF $FLAC
+fi
+
+# libsmf
+LIBSMF="libsmf-1.3"
+if test ! -f "$PREFIX"/build-stamps/libsmf; then
+  download http://download.sourceforge.net/libsmf/$LIBSMF.tar.gz
+  tar zxvf $LIBSMF.tar.gz
+  cd $LIBSMF
+  ./configure $COMMON_AUTOCONF_FLAGS
+  make LDFLAGS=-no-undefined
+  make install
+  cd ..
+  touch "$PREFIX"/build-stamps/libsmf
+  $RM_RF $LIBSMF
+fi
+
+# soundtouch
+SOUNDTOUCH="soundtouch-1.7.1"
+if test ! -f "$PREFIX"/build-stamps/soundtouch; then
+  download http://www.surina.net/soundtouch/$SOUNDTOUCH.tar.gz
+  tar zxvf $SOUNDTOUCH.tar.gz
+  cd soundtouch
+  ./bootstrap
+  ./configure $COMMON_AUTOCONF_FLAGS
+  make LDFLAGS=-no-undefined
+  make install
+  cd ..
+  touch "$PREFIX"/build-stamps/soundtouch
+  $RM_RF soundtouch
+fi
+
+# soundtouch-c
+# The reason we build this here even though it's from code in src/
+# is that we need a bridge into the MinGW-compiled C++ code that is
+# SoundTouch that we can link to with MSVC.
+if test ! -f "$PREFIX"/build-stamps/soundtouch-c; then
+  $CROSS_GXX -g -O2 -W -Wall `pkg-config --cflags glib-2.0 soundtouch` -fno-exceptions -fno-rtti -c -o soundtouch-c.o ../src/MixStream/soundtouch-c.cpp
+  rm -f "$PREFIX"/lib/soundtouch-c.lib
+  $CROSS_AR cru "$PREFIX"/lib/soundtouch-c.lib soundtouch-c.o
+  $CROSS_RANLIB "$PREFIX"/lib/soundtouch-c.lib
+  touch "$PREFIX"/build-stamps/soundtouch-c
+  $RM_RF soundtouch-c.o
+fi
+
+# FreeType
+FREETYPE="freetype-2.4.11"
+if test ! -f "$PREFIX"/build-stamps/freetype; then
+  download http://download.savannah.gnu.org/releases/freetype/$FREETYPE.tar.bz2
+  tar jxvf $FREETYPE.tar.bz2
+  cd $FREETYPE
+  ./configure $COMMON_AUTOCONF_FLAGS
+  make
+  make install
+  cd ..
+  touch "$PREFIX"/build-stamps/freetype
+  $RM_RF $FREETYPE
+fi
+
+# SDL
+SDL="SDL-1.2.15"
+if test ! -f "$PREFIX"/build-stamps/sdl; then
+  download http://www.libsdl.org/release/$SDL.tar.gz
+  tar zxvf $SDL.tar.gz
+  cd $SDL
+  ./configure $COMMON_AUTOCONF_FLAGS
+  make
+  make install
+  mv -v "$PREFIX"/lib/libSDLmain.a "$PREFIX"/lib/SDLmain.lib
+  rm -f "$PREFIX"/lib/libSDLmain.la
+  # Compatible with MSVC, unlike what was already installed as SDL_config.h
+  cp -v include/SDL_config_win32.h "$PREFIX"/include/SDL/SDL_config.h
+  cd ..
+  touch "$PREFIX"/build-stamps/sdl
+  $RM_RF $SDL
+fi
+
+# SDL_mixer
+SDLMIXER="SDL_mixer-1.2.12"
+if test ! -f "$PREFIX"/build-stamps/sdl_mixer; then
+  download http://www.libsdl.org/projects/SDL_mixer/release/$SDLMIXER.tar.gz
+  tar zxvf $SDLMIXER.tar.gz
+  cd $SDLMIXER
+  ./configure $COMMON_AUTOCONF_FLAGS --disable-music-mod --disable-music-midi --disable-music-mp3
+  make
+  make install
+  cd ..
+  touch "$PREFIX"/build-stamps/sdl_mixer
+  $RM_RF $SDLMIXER
+fi
+
+# SDL_ttf
+SDLTTF="SDL_ttf-2.0.11"
+if test ! -f "$PREFIX"/build-stamps/sdl_ttf; then
+  download http://www.libsdl.org/projects/SDL_ttf/release/$SDLTTF.tar.gz
+  tar zxvf $SDLTTF.tar.gz
+  cd $SDLTTF
+  ./configure $COMMON_AUTOCONF_FLAGS
+  make
+  make install
+  cd ..
+  touch "$PREFIX"/build-stamps/sdl_ttf
+  $RM_RF $SDLTTF
+fi
+
+# SDL_image
+# http://www.libsdl.org/projects/SDL_image/release/SDL_image-1.2.12.tar.gz
+SDLIMAGE="SDL_image-1.2.12"
+if test ! -f "$PREFIX"/build-stamps/sdl_image; then
+  download http://www.libsdl.org/projects/SDL_image/release/$SDLIMAGE.tar.gz
+  tar zxvf $SDLIMAGE.tar.gz
+  cd $SDLIMAGE
+  ./configure $COMMON_AUTOCONF_FLAGS
+  make
+  make install
+  cd ..
+  touch "$PREFIX"/build-stamps/sdl_image
+  $RM_RF $SDLIMAGE
+fi
+
+# portaudio
+PORTAUDIO="pa_stable_v19_20111121"
+if test ! -f "$PREFIX"/build-stamps/portaudio; then
+  download http://www.portaudio.com/archives/$PORTAUDIO.tgz
+  tar zxvf $PORTAUDIO.tgz
+  cd portaudio
+  ./configure $COMMON_AUTOCONF_FLAGS --with-winapi=directx
+  make
+  make install
+  cd ..
+  touch "$PREFIX"/build-stamps/portaudio
+  $RM_RF portaudio
+fi
+
+# PortMidi, which unfortunately lacks a decent build system.
+# (Yes, I do see the CMakeLists.txt there, but it insists on building
+# some things that won't fly in this environment.)
+PORTMIDI="portmidi-src-217"
+if test ! -f "$PREFIX"/build-stamps/portmidi; then
+  download http://download.sourceforge.net/portmedia/$PORTMIDI.zip
+  unzip -o $PORTMIDI.zip
+  cd portmidi
+  $CROSS_GCC -g -O2 -W -Wall -Iporttime -DNDEBUG -D_WINDLL -mdll -o porttime.dll -Wl,--out-implib,libporttime.dll.a porttime/ptwinmm.c -lwinmm
+  $CROSS_GCC -g -O2 -W -Wall -Ipm_common -Iporttime -DNDEBUG -D_WINDLL -mdll -o portmidi.dll -Wl,--out-implib,libportmidi.dll.a pm_win/pmwin.c pm_win/pmwinmm.c pm_common/pmutil.c pm_common/portmidi.c -L. -lporttime -lwinmm
+  cp -v portmidi.dll porttime.dll "$PREFIX"/bin
+  cp -v libportmidi.dll.a libporttime.dll.a "$PREFIX"/lib
+  cp -v pm_common/portmidi.h porttime/porttime.h "$PREFIX"/include
+  cd ..
+  touch "$PREFIX"/build-stamps/portmidi
+  $RM_RF portmidi
+fi
+
+# ffmpeg
+# We only need libswscale.
+FFMPEG="ffmpeg-1.1.3"
+if test ! -f "$PREFIX"/build-stamps/ffmpeg; then
+  download http://www.ffmpeg.org/releases/$FFMPEG.tar.bz2
+  tar jxvf $FFMPEG.tar.bz2
+  cd $FFMPEG
+  patch -Np1 -i ../ffmpeg-implib-install.patch
+  ./configure --prefix="$PREFIX" --cc="$CROSS_GCC" --nm="$CROSS_NM" --target-os=mingw32 --arch=i386 --disable-static --enable-shared --enable-runtime-cpudetect --enable-memalign-hack --disable-everything --disable-ffmpeg --disable-ffplay --disable-ffserver --disable-ffprobe --disable-avdevice --disable-avcodec --disable-avformat --disable-avfilter --disable-swresample --disable-doc
+  make
+  make install
   cd ..
   touch "$PREFIX"/build-stamps/ffmpeg
-  $RM_RF ffmpeg
+  $RM_RF $FFMPEG
 fi
 
 # msinttypes
@@ -288,7 +521,3 @@ if test ! -f "$PREFIX"/build-stamps/msinttypes; then
 fi
 
 echo "All dependencies done."
-
-echo -n "Creating .def files... "
-python makedefs.py deps/lib deps/bin "$CROSS_DLLTOOL -I"
-echo "done"

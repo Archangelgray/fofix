@@ -32,7 +32,7 @@
 
 from __future__ import with_statement
 
-from Scene import Scene, SuppressScene
+from Scene import Scene
 from Song import Note, TextEvent, PictureEvent, loadSong, Bars, VocalPhrase
 from Menu import Menu
 
@@ -40,7 +40,6 @@ from Language import _
 import Player
 from Player import STAR, KILL, CANCEL, KEY1A
 import Dialogs
-import Audio
 import Stage
 import Settings
 import Song
@@ -57,16 +56,13 @@ from OpenGL.GL import *
 
 from math import degrees, atan
 
+from constants import *
+
 class GuitarScene(Scene):
     def __init__(self, engine, libraryName, songName):
         Scene.__init__(self, engine)
 
-        if self.engine.world.sceneName == "GuitarScene":  #MFH - dual / triple loading cycle fix
-            Log.warn("Extra GuitarScene was instantiated, but detected and shut down.  Cause unknown.")
-            raise SuppressScene  #stump
-        else:
-            self.engine.createdGuitarScene = True
-            self.engine.world.sceneName = "GuitarScene"
+        self.engine.world.sceneName = "GuitarScene"
 
         self.playerList   = self.players
 
@@ -237,7 +233,6 @@ class GuitarScene(Scene):
                 self.soloKeysList.append([])
                 self.soloShifts.append([])
 
-        self.guitars = self.instruments #for compatibility - I'll try to fix this...
         Log.debug("GuitarScene keysList: %s" % str(self.keysList))
 
         #for number formatting with commas for Rock Band:
@@ -350,8 +345,7 @@ class GuitarScene(Scene):
         self.lastSongPos      = 0.0
         self.keyBurstTimeout  = [None for i in self.playerList]
         self.keyBurstPeriod   = 30
-        self.camera.target    = (0.0, 0.0, 4.0)
-        self.camera.origin    = (0.0, 3.0, -3.0)
+
         self.camera.target    = (0.0, 1.0, 8.0)
         self.camera.origin    = (0.0, 2.0, -3.4)
 
@@ -369,8 +363,7 @@ class GuitarScene(Scene):
         self.neckintroAnimationType = self.engine.config.get("fretboard", "neck_intro_animation")#weirdpeople
         self.neckintroThemeType = self.engine.theme.povIntroAnimation
 
-        povList = [str(self.targetX), str(self.targetY), str(self.targetZ), str(self.originX), str(self.originY), str(self.originZ)]
-        if "None" not in povList:
+        if None not in [self.targetX, self.targetY, self.targetZ, self.originX, self.originY, self.originZ]:
             self.customPOV = True
             Log.debug("All theme POV set. Using custom camera POV.")
 
@@ -560,7 +553,7 @@ class GuitarScene(Scene):
         self.drumMisses = self.engine.config.get("game", "T_sound") #Faaa Drum sound
 
         #MFH - constant definitions, ini value retrievals
-        self.pitchBendLowestFactor = .90 #stump: perhaps read this from song.ini and fall back on a specific value?
+        self.pitchBendSemitones = -1.0 #stump: perhaps read this from song.ini and fall back on a specific value?
         self.lineByLineLyricMaxLineWidth = 0.5
         self.lineByLineStartSlopMs = 750
         self.digitalKillswitchStarpowerChunkSize = 0.05 * self.engine.audioSpeedFactor
@@ -591,7 +584,6 @@ class GuitarScene(Scene):
         self.hitAccuracyPos = self.engine.config.get("game", "accuracy_pos")
         self.showUnusedTextEvents = self.engine.config.get("game", "show_unused_text_events")
         self.bassKickSoundEnabled = self.engine.config.get("game", "bass_kick_sound")
-        self.gameTimeMode = self.engine.config.get("game", "game_time")
         self.midiLyricsEnabled = self.engine.config.get("game", "rb_midi_lyrics")
         self.midiSectionsEnabled = self.engine.config.get("game", "rb_midi_sections") #MFH
         if self.numOfPlayers > 1 and self.midiLyricsEnabled == 1:
@@ -609,7 +601,6 @@ class GuitarScene(Scene):
         self.ignoreOpenStrums = self.engine.config.get("game", "ignore_open_strums") #MFH
         self.muteSustainReleases = self.engine.config.get("game", "sustain_muting") #MFH
         self.hopoIndicatorEnabled = self.engine.config.get("game", "hopo_indicator") #MFH
-        self.fontShadowing = self.engine.config.get("game", "in_game_font_shadowing") #MFH
         self.muteLastSecond = self.engine.config.get("audio", "mute_last_second") #MFH
         self.mutedLastSecondYet = False
         self.muteDrumFill = self.engine.config.get("game", "mute_drum_fill") #MFH
@@ -622,9 +613,6 @@ class GuitarScene(Scene):
         self.logStarpowerMisses = self.engine.config.get("game", "log_starpower_misses")
         self.soloFrameMode = self.engine.config.get("game", "solo_frame")
         self.whammyEffect = self.engine.config.get("audio",  "whammy_effect")
-        if self.whammyEffect == 1 and not Audio.pitchBendSupported:    #pitchbend
-            Dialogs.showMessage(self.engine, "Pitchbend module not found!  Forcing Killswitch effect.")
-            self.whammyEffect = 0
         shaders.var["whammy"] = self.whammyEffect
         self.bigRockEndings = self.engine.config.get("game", "big_rock_endings")
         self.showFreestyleActive = self.engine.config.get("debug",   "show_freestyle_active")
@@ -727,7 +715,6 @@ class GuitarScene(Scene):
 
         self.inGameStats = self.engine.config.get("performance","in_game_stats")
         self.inGameStars = self.engine.config.get("game","in_game_stars")
-        self.partialStars = self.engine.config.get("game","partial_stars")
 
 
         self.guitarSoloAccuracyDisplayMode = self.engine.config.get("game", "gsolo_accuracy_disp")
@@ -826,7 +813,6 @@ class GuitarScene(Scene):
         self.failViz = [0.0 for i in self.playerList]
 
         self.phrases = self.engine.config.get("coffee", "game_phrases")#blazingamer
-        self.starfx = self.engine.config.get("game", "starfx")#blazingamer
 
         #weirdpeople - sets the distances the neck has to move in the animation
         if self.neckintroAnimationType == 0: #Original
@@ -1592,7 +1578,6 @@ class GuitarScene(Scene):
         Dialogs.hideLoadingSplashScreen(self.engine, splash)
         splash = None
 
-        self.engine.createdGuitarScene = False
         #MFH - end of GuitarScene client initialization routine
 
 
@@ -1732,8 +1717,6 @@ class GuitarScene(Scene):
             self.song.tracks = None
             self.song.eventTracks = None
             self.song.midiEventTracks = None
-            if self.whammyEffect == 1:
-                self.song.resetInstrumentPitch(-1)
         self.song = None
 
         #MFH - additional cleanup!
@@ -2023,8 +2006,6 @@ class GuitarScene(Scene):
             self.song.stop()
         self.resetVariablesToDefaults()
         self.done = True
-        # evilynux - Reset speed
-        self.engine.setSpeedFactor(1.0)
 
         self.engine.view.setViewport(1,0)
         self.engine.view.popLayer(self.menu)
@@ -2051,8 +2032,6 @@ class GuitarScene(Scene):
             self.song.stop()
             self.song  = None
         self.resetVariablesToDefaults()
-        # evilynux - Reset speed
-        self.engine.setSpeedFactor(1.0)
         self.engine.view.setViewport(1,0)
         self.engine.view.popLayer(self.menu)
         self.engine.view.popLayer(self.failMenu)
@@ -2065,8 +2044,6 @@ class GuitarScene(Scene):
             self.song.stop()
             self.song  = None
         self.resetVariablesToDefaults()
-        # evilynux - Reset speed
-        self.engine.setSpeedFactor(1.0)
 
         self.engine.view.setViewport(1,0)
         self.engine.view.popLayer(self.failMenu)
@@ -2593,7 +2570,7 @@ class GuitarScene(Scene):
                             if self.whammyEffect == 0:    #killswitch
                                 self.song.setInstrumentVolume(whammyVolSet, self.players[i].part)
                             elif self.whammyEffect == 1:    #pitchbend
-                                self.song.setInstrumentPitch(self.pitchBendLowestFactor+((1.0-self.pitchBendLowestFactor)*(1.0-self.whammyVol[i])), self.players[i].part)
+                                self.song.setInstrumentPitch(self.pitchBendSemitones*self.whammyVol[i], self.players[i].part)
 
 
                         elif self.actualWhammyVol[i] > self.targetWhammyVol[i]:
@@ -2602,7 +2579,7 @@ class GuitarScene(Scene):
                             if self.whammyEffect == 0:    #killswitch
                                 self.song.setInstrumentVolume(whammyVolSet, self.players[i].part)
                             elif self.whammyEffect == 1:    #pitchbend
-                                self.song.setInstrumentPitch(self.pitchBendLowestFactor+((1.0-self.pitchBendLowestFactor)*(1.0-self.whammyVol[i])), self.players[i].part)
+                                self.song.setInstrumentPitch(self.pitchBendSemitones*self.whammyVol[i], self.players[i].part)
 
                     elif self.scoring[i].streak > 0:
                         self.song.setInstrumentVolume(1.0, self.players[i].part)
@@ -2618,7 +2595,7 @@ class GuitarScene(Scene):
                                 if self.whammyEffect == 0:    #killswitch
                                     self.song.setInstrumentVolume(self.killVolume, self.players[i].part)  #MFH
                                 elif self.whammyEffect == 1:    #pitchbend
-                                    self.song.setInstrumentPitch(self.pitchBendLowestFactor+((1.0-self.pitchBendLowestFactor)*self.whammyVol[i]), self.players[i].part)
+                                    self.song.setInstrumentPitch(self.pitchBendSemitones*(1.0-self.whammyVol[i]), self.players[i].part)
                                 if self.instruments[i].killPoints:
                                     self.instruments[i].starPower += self.digitalKillswitchStarpowerChunkSize
                                     if self.instruments[i].starPower > 100:
@@ -3803,7 +3780,6 @@ class GuitarScene(Scene):
                     self.getHandicap()
                     self.song.setAllTrackVolumes(1)
                     self.song.setCrowdVolume(0.0)
-                    self.song.clearPause()
                     self.crowdsCheering = False #catches crowdsEnabled != 3, pause before countdown, set to 3
                     self.starPowersActive = 0
                     self.playersInGreen = 0
@@ -4857,10 +4833,7 @@ class GuitarScene(Scene):
         wBak = w
         hBak = h
 
-        if self.fontShadowing:
-            font    = self.engine.data.shadowFont
-        else:
-            font    = self.engine.data.font
+        font    = self.engine.data.font
         lyricFont = self.engine.data.songFont
         bigFont = self.engine.data.bigFont
         sphraseFont = self.engine.data.streakFont2
@@ -4878,7 +4851,7 @@ class GuitarScene(Scene):
                 self.renderVocals()
                 #MFH: render the note sheet just on top of the background:
                 if self.lyricSheet != None and not self.playingVocals:
-                    self.engine.drawImage(self.lyricSheet, scale = (1.0,-1.0), coord = (w/2, h*0.935), stretched = 1)
+                    self.engine.drawImage(self.lyricSheet, scale = (1.0,-1.0), coord = (w/2, h*0.935), stretched = FIT_WIDTH)
                     #the timing line on this lyric sheet image is approx. 1/4 over from the left
                 #MFH - also render the scrolling lyrics & sections before changing viewports:
 
@@ -5072,12 +5045,12 @@ class GuitarScene(Scene):
                             if self.pause:
                                 self.engine.view.setViewport(1,0)
                                 if self.engine.graphicMenuShown == False:
-                                    self.engine.drawImage(self.pauseScreen, scale = (self.pause_bkg[2], -self.pause_bkg[3]), coord = (w*self.pause_bkg[0],h*self.pause_bkg[1]), stretched = 3)
+                                    self.engine.drawImage(self.pauseScreen, scale = (self.pause_bkg[2], -self.pause_bkg[3]), coord = (w*self.pause_bkg[0],h*self.pause_bkg[1]), stretched = FULL_SCREEN)
 
                             if self.finalFailed and self.song:
                                 self.engine.view.setViewport(1,0)
                                 if self.engine.graphicMenuShown == False:
-                                    self.engine.drawImage(self.failScreen, scale = (self.fail_bkg[2], -self.fail_bkg[3]), coord = (w*self.fail_bkg[0],h*self.fail_bkg[1]), stretched = 3)
+                                    self.engine.drawImage(self.failScreen, scale = (self.fail_bkg[2], -self.fail_bkg[3]), coord = (w*self.fail_bkg[0],h*self.fail_bkg[1]), stretched = FULL_SCREEN)
 
                                 # evilynux - Closer to actual GH3
                                 font = self.engine.data.pauseFont

@@ -44,7 +44,7 @@ class SvgContext(object):
 
     def setGeometry(self, geometry = None):
         glViewport(geometry[0], geometry[1], geometry[2], geometry[3])
-        glScalef(geometry[2] / 640.0, geometry[3] / 480.0, 1.0)
+        glScalef(geometry[2] / SCREEN_WIDTH, geometry[3] / SCREEN_HEIGHT, 1.0)
 
     def setProjection(self, geometry = None):
         geometry = geometry or self.geometry
@@ -60,6 +60,29 @@ class SvgContext(object):
         glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
 class ImgDrawing(object):
+    VTX_ARRAY = np.array([[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]], dtype=np.float32) #hard-coded quad for drawing textures onto
+
+    def drawImage(image, scale = (1.0, -1.0), coord = (0, 0), rot = 0, \
+                  color = (1,1,1,1), rect = (0,1,0,1), stretched = 0, fit = CENTER, \
+                  alignment = CENTER, valignment = CENTER):
+        """
+        Draws the image/surface to screen
+        """
+
+        if not isinstance(image, ImgDrawing):
+            return False
+
+        image.setRect(rect)
+        image.setScale(scale[0], scale[1], stretched)
+        image.setPosition(coord[0], coord[1], fit)
+        image.setAlignment(alignment)
+        image.setVAlignment(valignment)
+        image.setAngle(rot)
+        image.setColor(color)
+        image.draw()
+
+        return True
+
     def __init__(self, context, ImgData):
         self.ImgData = None
         self.texture = None
@@ -68,9 +91,9 @@ class ImgDrawing(object):
         self.filename = ImgData
 
         # Detect the type of data passed in
-        if type(ImgData) == file:
+        if isinstance(ImgData, file):
             self.ImgData = ImgData.read()
-        elif type(ImgData) == str:
+        elif isinstance(ImgData, basestring):
             self.texture = Texture(ImgData)
         elif isinstance(ImgData, Image.Image): #stump: let a PIL image be passed in
             self.texture = Texture()
@@ -78,7 +101,7 @@ class ImgDrawing(object):
 
         # Make sure we have a valid texture
         if not self.texture:
-            if type(ImgData) == str:
+            if isinstance(ImgData, basestring):
                 e = "Unable to load texture for %s." % ImgData
             else:
                 e = "Unable to load texture for SVG file."
@@ -96,23 +119,9 @@ class ImgDrawing(object):
 
         self.path = self.texture.name           #path of the image file
 
-        self.createArrays()
-
-    def createArrays(self):
-        self.vtxArray = np.zeros((4,2), dtype=np.float32)
         self.texArray = np.zeros((4,2), dtype=np.float32)
 
-        self.createVtx()
         self.createTex()
-
-    def createVtx(self):
-        vA = self.vtxArray #short hand variable casting
-
-        #topLeft, topRight, bottomRight, bottomLeft
-        vA[0,0] = 0.0; vA[0,1] = 1.0
-        vA[1,0] = 1.0; vA[1,1] = 1.0
-        vA[2,0] = 1.0; vA[2,1] = 0.0
-        vA[3,0] = 0.0; vA[3,1] = 0.0
 
     def createTex(self):
         tA = self.texArray
@@ -125,56 +134,118 @@ class ImgDrawing(object):
         tA[3,0] = rect[0]; tA[3,1] = rect[2]
 
     def width1(self):
+        """
+        @return the width of the texture in pixels
+        """
         width = self.pixelSize[0]
         if width:
             return width
         else:
             return 0
 
-    #myfingershurt:
     def height1(self):
+        """
+        @return the height of the texture in pixels
+        """
         height = self.pixelSize[1]
-        if height:
+        if height is not None:
             return height
         else:
             return 0
 
     def widthf(self, pixelw):
+        """
+        @param pixelw - a width in pixels
+        @return the scaled ratio of the pixelw divided by the pixel width of the texture
+        """
         width = self.pixelSize[0]
-        if width:
+        if width is not None:
             wfactor = pixelw/width
             return wfactor
         else:
             return 0
 
-    def setPosition(self, x, y):
+    def setPosition(self, x, y, fit = CENTER):
+        """
+        Sets position of this image on screen 
+
+        @param fit:          Adjusts the texture so the coordinate for the y-axis placement can be
+                             on the top side (1), bottom side (2), or center point (any other value) of the image
+        """
+        if fit == CENTER: #y is center
+            pass
+        elif fit == TOP: #y is on top (not center)
+            y = y - ((self.pixelSize[1] * abs(self.scale[1]))*.5*(self.context.geometry[3]/SCREEN_HEIGHT))
+        elif fit == BOTTOM: #y is on bottom
+            y = y + ((self.pixelSize[1] * abs(self.scale[1]))*.5*(self.context.geometry[3]/SCREEN_HEIGHT))
+
         self.position = [x,y]
 
-    def setScale(self, width, height):
+    def setScale(self, width, height, stretched = 0):
+        """
+        @param stretched:    Bitmask stretching the image according to the following values
+                                 0) does not stretch the image
+                                 1) fits it to the width of the viewport
+                                 2) fits it to the height of the viewport
+                                 3) stretches it so it fits the viewport
+                                 4) preserves the aspect ratio while stretching
+        """
+        if stretched & FULL_SCREEN: # FULL_SCREEN is FIT_WIDTH | FIT_HEIGHT
+            xStretch = 1
+            yStretch = 1
+            if stretched & FIT_WIDTH:
+                xStretch = float(self.context.geometry[2]) / self.pixelSize[0]
+            if stretched & FIT_HEIGHT:
+                yStretch = float(self.context.geometry[3]) / self.pixelSize[1]
+            if stretched & KEEP_ASPECT:
+                if stretched & FULL_SCREEN == FULL_SCREEN: #Note that on FULL_SCREEN | KEEP_ASPECT we will scale to the larger and clip.
+                    if xStretch > yStretch:
+                       yStretch = xStretch
+                    else:
+                       xStretch = yStretch
+                else:
+                    if stretched & FIT_WIDTH:
+                        yStretch = xStretch
+                    else:
+                        xStretch = yStretch
+            width *= xStretch
+            height *= yStretch
+
         self.scale = [width, height]
 
     def setAngle(self, angle):
         self.angle = angle
 
     def setRect(self, rect):
+        """
+        @param rect:         The surface rectangle, this is used for cropping the texture
+        """
         if not rect == self.rect:
             self.rect = rect
             self.createTex()
 
     def setAlignment(self, alignment):
-        if alignment == LEFT:  #left
-            self.shift = 0
-        elif alignment == CENTER:#center
+        """
+        @param alignment:    Adjusts the texture so the coordinate for x-axis placement can either be
+                             on the left side (0), center point (1), or right(2) side of the image
+        """
+        if alignment == CENTER:#center
             self.shift = -.5
+        elif alignment == LEFT:  #left
+            self.shift = 0
         elif alignment == RIGHT:#right
             self.shift = -1.0
 
     def setVAlignment(self, alignment):
-        if alignment == 0:  #bottom
-            self.vshift = 0
-        elif alignment == 1:#center
+        """
+        @param valignment:   Adjusts the texture so the coordinate for y-axis placement can either be
+                             on the bottom side (0), center point (1), or top(2) side of the image
+        """
+        if alignment == CENTER:#center
             self.vshift = -.5
-        elif alignment == 2:#top
+        if alignment == TOP:#bottom
+            self.vshift = 0
+        elif alignment == BOTTOM:#top
             self.vshift = -1.0
 
     def setColor(self, color):
@@ -202,5 +273,5 @@ class ImgDrawing(object):
 
                     glEnable(GL_TEXTURE_2D)
                     self.texture.bind()
-                    cmgl.drawArrays(GL_QUADS, vertices=self.vtxArray, texcoords=self.texArray)
+                    cmgl.drawArrays(GL_QUADS, vertices=ImgDrawing.VTX_ARRAY, texcoords=self.texArray)
                     glDisable(GL_TEXTURE_2D)

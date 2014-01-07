@@ -29,7 +29,7 @@
 
 from __future__ import with_statement
 
-from Scene import Scene, SuppressScene
+from Scene import Scene
 import Scorekeeper
 import Dialogs
 import Song
@@ -49,15 +49,13 @@ import random
 import os
 from OpenGL.GL import *
 
+from constants import *
+
 class GameResultsScene(Scene):
     def __init__(self, engine, libraryName, songName, scores = None, coOpType = False, careerMode = False):
         Scene.__init__(self, engine)
 
-        if self.engine.world.sceneName == "GameResultsScene":  #MFH - dual / triple loading cycle fix
-            Log.warn("Extra GameResultsScene was instantiated, but detected and shut down.  Cause unknown.")
-            raise SuppressScene  #stump
-        else:
-            self.engine.world.sceneName = "GameResultsScene"
+        self.engine.world.sceneName = "GameResultsScene"
 
         self.logClassInits = self.engine.config.get("game", "log_class_inits")
         if self.logClassInits == 1:
@@ -213,8 +211,6 @@ class GameResultsScene(Scene):
             self.singleView = True
 
         slowdown = self.engine.audioSpeedFactor
-        # evilynux - Reset speed
-        self.engine.setSpeedFactor(1.0)
 
         a = len(Scorekeeper.HANDICAPS)
         for i, scoreCard in enumerate(self.scoring):
@@ -300,19 +296,11 @@ class GameResultsScene(Scene):
         else:
             self.hitWindow = _("Standard")
 
-        jurgen   = self.engine.config.get("game", "jurgmode")
-        jurgplay = self.engine.config.get("game", "jurgtype")
-
         self.progressKeys   = []
         self.playerProgressKeys = [[] for i in self.playerList]
         for i, player in enumerate(self.playerList):
             self.progressKeys.extend(player.progressKeys)
             self.playerProgressKeys[i] = player.progressKeys
-        if jurgen == 0:
-            if jurgplay == 1 and len(self.playerList) > 1:
-                self.playerProgressKeys[1] = self.progressKeys
-            else:
-                self.playerProgressKeys = [self.progressKeys for i in self.playerList]
 
         self.part = [None for i in self.playerList]
         self.partImage = True
@@ -817,7 +805,7 @@ class GameResultsScene(Scene):
 
         w, h = self.fullView
         if self.background:
-            self.engine.drawImage(self.background, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
+            self.engine.drawImage(self.background, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
         self.engine.theme.setBaseColor(1-v)
 
@@ -985,7 +973,7 @@ class GameResultsScene(Scene):
 
         w, h = self.fullView
         if self.background:
-            self.engine.drawImage(self.background, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
+            self.engine.drawImage(self.background, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
         self.engine.theme.setBaseColor(1-v)
 
@@ -1225,7 +1213,7 @@ class GameResultsScene(Scene):
             font  = self.engine.data.fontDict[self.engine.theme.result_high_score_font]
         except KeyError:
             font  = self.engine.data.font
-        Dialogs.fadeScreen(.2)
+        self.engine.fadeScreen(.2)
         v = ((1 - visibility) **2)
 
         w, h = self.fullView

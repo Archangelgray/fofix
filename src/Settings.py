@@ -228,11 +228,6 @@ class KeyConfigChoice(Menu.Choice):
     def change(self):
         o = self.config.prototype[self.section][self.option]
 
-        if isinstance(o.options, dict):
-            for k, v in o.options.items():
-                if v == value: #FIXME: value?
-                    value = k
-                    break
         if isinstance(o.text, tuple):
             type = self.type
             if len(o.text) == 5:
@@ -832,9 +827,11 @@ class SettingsMenu(Menu.Menu):
 
         self.inGameDisplaySettings = [
           (_("Theme Display Settings"), self.themeDisplayMenu, _("Change settings that only affect certain theme types.")),
+          ConfigChoice(self.engine, self.engine.config, "game", "in_game_stars", autoApply = True, isQuickset = 2),
           ConfigChoice(self.engine, self.engine.config, "coffee", "game_phrases", autoApply = True, isQuickset = 1),
           ConfigChoice(self.engine, self.engine.config, "game", "hopo_indicator", autoApply = True),
           ConfigChoice(self.engine, self.engine.config, "game", "accuracy_mode", autoApply = True),
+          ConfigChoice(self.engine, self.engine.config, "performance", "in_game_stats", autoApply = True, isQuickset = 1),
           ConfigChoice(self.engine, self.engine.config, "game", "gsolo_accuracy_disp", autoApply = True, isQuickset = 1), #MFH
           ConfigChoice(self.engine, self.engine.config, "game", "solo_frame", autoApply = True),      #myfingershurt
           ConfigChoice(self.engine, self.engine.config, "video", "disable_fretsfx", autoApply = True),
@@ -900,11 +897,9 @@ class SettingsMenu(Menu.Menu):
 
         #MFH - new menu
         self.logfileSettings = [
-          ConfigChoice(engine, engine.config, "game", "log_ini_reads", autoApply = True),#myfingershurt
           ConfigChoice(engine, engine.config, "game", "log_class_inits", autoApply = True),#myfingershurt
           ConfigChoice(engine, engine.config, "game", "log_loadings", autoApply = True),#myfingershurt
           ConfigChoice(engine, engine.config, "game", "log_sections", autoApply = True),#myfingershurt
-          ConfigChoice(engine, engine.config, "game", "log_undefined_gets", autoApply = True),#myfingershurt
           ConfigChoice(engine, engine.config, "game", "log_marker_notes", autoApply = True),#myfingershurt
           ConfigChoice(engine, engine.config, "game", "log_starpower_misses", autoApply = True),#myfingershurt
           ConfigChoice(engine, engine.config, "log",   "log_unedited_midis", autoApply = True),#myfingershurt
@@ -924,7 +919,6 @@ class SettingsMenu(Menu.Menu):
           ConfigChoice(engine, engine.config, "debug",   "show_freestyle_active", autoApply = True),#myfingershurt
           ConfigChoice(engine, engine.config, "debug",   "show_bpm", autoApply = True),#myfingershurt
           ConfigChoice(engine, engine.config, "debug",   "use_new_vbpm_beta", autoApply = True),#myfingershurt
-          ConfigChoice(engine, engine.config, "debug",   "use_new_song_database", autoApply = True),  #stump
         ]
         self.debugSettingsMenu = Menu.Menu(engine, self.debugSettings, pos = (self.opt_text_x, self.opt_text_y), textColor = self.opt_text_color, selectedColor = self.opt_selected_color)
 
@@ -960,7 +954,6 @@ class SettingsMenu(Menu.Menu):
         advancedSettings = [
           ConfigChoice(engine, engine.config, "performance", "game_priority", autoApply = True, isQuickset = 1),
           ConfigChoice(engine, engine.config, "performance", "restrict_to_first_processor"),  #stump
-          ConfigChoice(engine, engine.config, "performance", "use_psyco"),
           (_("Debug Settings"), self.debugSettingsMenu, _("Settings for coders to debug. Probably not worth changing.")),
           (_("Log Settings"),    self.logfileSettingsMenu, _("Adds junk information to the logfile. Probably not useful in bug reports.")),
         ]
@@ -1181,7 +1174,9 @@ class BasicSettingsMenu(Menu.Menu):
         self.keySettingsMenu = Menu.Menu(self.engine, self.keySettings, onClose = self.controlCheck, pos = (self.opt_text_x, self.opt_text_y), textColor = self.opt_text_color, selectedColor = self.opt_selected_color)
 
         InGameDisplaySettings = [
+          ConfigChoice(engine, engine.config, "game", "in_game_stars", autoApply = True, isQuickset = 2),
           ConfigChoice(engine, engine.config, "game", "accuracy_mode", autoApply = True),
+          ConfigChoice(engine, engine.config, "performance", "in_game_stats", autoApply = True, isQuickset = 1),
           ConfigChoice(engine, engine.config, "video", "counting", autoApply = True, isQuickset = 2),
         ]
         InGameDisplayMenu = Menu.Menu(engine, InGameDisplaySettings, pos = (self.opt_text_x, self.opt_text_y), textColor = self.opt_text_color, selectedColor = self.opt_selected_color)
@@ -1373,6 +1368,7 @@ def quickset(config):
         config.set("game", "sp_notes_while_active", 1)
         config.set("game", "bass_groove_enable", 1)
         config.set("game", "big_rock_endings", 1)
+        config.set("game", "in_game_stars", 1)
         config.set("game", "mark_solo_sections", 2)
         Log.debug("Quickset Gameplay - Theme-Based")
 
@@ -1387,6 +1383,7 @@ def quickset(config):
         config.set("game", "sp_notes_while_active", 3)
         config.set("game", "bass_groove_enable", 3)
         config.set("game", "big_rock_endings", 2)
+        config.set("game", "in_game_stars", 2)
         config.set("game", "counting", True)
         config.set("game", "mark_solo_sections", 1)
         Log.debug("Quickset Gameplay - RB style")
@@ -1395,6 +1392,7 @@ def quickset(config):
         config.set("game", "sp_notes_while_active", 0)
         config.set("game", "bass_groove_enable", 0)
         config.set("game", "big_rock_endings", 0)
+        config.set("game", "in_game_stars", 0)
         config.set("game", "counting", False)
         config.set("game", "mark_solo_sections", 0)
         Log.debug("Quickset Gameplay - GH style")
@@ -1403,6 +1401,7 @@ def quickset(config):
         config.set("game", "sp_notes_while_active", 0)
         config.set("game", "bass_groove_enable", 0)
         config.set("game", "big_rock_endings", 0)
+        config.set("game", "in_game_stars", 0)
         config.set("game", "counting", True)
         config.set("game", "mark_solo_sections", 1)
         Log.debug("Quickset Gameplay - WT style")
@@ -1429,6 +1428,7 @@ def quickset(config):
         config.set("game", "lyric_mode", 0)
         config.set("game", "use_graphical_submenu", 0)
         config.set("audio", "enable_crowd_tracks", 0)
+        config.set("performance", "in_game_stats", 0)
         config.set("performance", "static_strings", True)
         config.set("performance", "disable_libcount", True)
         config.set("performance", "killfx", 2)
@@ -1453,6 +1453,7 @@ def quickset(config):
         config.set("game", "lyric_mode", 2)
         config.set("game", "use_graphical_submenu", 0)
         config.set("audio", "enable_crowd_tracks", 1)
+        config.set("performance", "in_game_stats", 0)
         config.set("performance", "static_strings", True)
         config.set("performance", "disable_libcount", True)
         config.set("performance", "killfx", 0)
@@ -1476,6 +1477,7 @@ def quickset(config):
         config.set("game", "lyric_mode", 2)
         config.set("game", "use_graphical_submenu", 1)
         config.set("audio", "enable_crowd_tracks", 1)
+        config.set("performance", "in_game_stats", 2)
         config.set("performance", "static_strings", True)
         config.set("performance", "disable_libcount", True)
         config.set("performance", "killfx", 0)
@@ -1500,6 +1502,7 @@ def quickset(config):
         config.set("game", "lyric_mode", 2)
         config.set("game", "use_graphical_submenu", 1)
         config.set("audio", "enable_crowd_tracks", 1)
+        config.set("performance", "in_game_stats", 2)
         config.set("performance", "static_strings", False)
         config.set("performance", "disable_libcount", False)
         config.set("performance", "killfx", 0)

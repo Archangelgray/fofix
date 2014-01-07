@@ -26,6 +26,7 @@ import Log
 import gettext
 import os
 import glob
+from Unicode import unicodify
 
 Config.define("game", "language", str, "")
 
@@ -33,9 +34,8 @@ def getAvailableLanguages():
     return [os.path.basename(l).capitalize().replace(".mo", "").replace("_", " ") for l in glob.glob(os.path.join(Version.dataPath(), "translations", "*.mo"))]
 
 def dummyTranslator(string):
-    return string
+    return unicodify(string)
 
-encoding = Config.load(Version.PROGRAM_UNIXSTYLE_NAME + ".ini").get("game", "encoding")
 language = Config.load(Version.PROGRAM_UNIXSTYLE_NAME + ".ini").get("game", "language")
 _ = dummyTranslator
 
@@ -44,10 +44,7 @@ if language:
         trFile = os.path.join(Version.dataPath(), "translations", "%s.mo" % language.lower().replace(" ", "_"))
         catalog = gettext.GNUTranslations(open(trFile, "rb"))
         def translate(m):
-            if encoding == "None":
-                return catalog.gettext(m).decode("iso-8859-1")
-            else:
-                return catalog.gettext(m).decode(encoding)
+            return catalog.ugettext(m)
         _ = translate
     except Exception, x:
         Log.warn("Unable to select language '%s': %s" % (language, x))

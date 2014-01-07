@@ -32,7 +32,6 @@ import os
 from View import Layer
 from Input import KeyListener
 import Data
-import Dialogs
 import Player
 
 import Log
@@ -394,13 +393,13 @@ class Menu(Layer, KeyListener):
             tipFont = self.tipFont
 
             if self.fadeScreen:
-                Dialogs.fadeScreen(v)
+                self.engine.fadeScreen(v)
 
             wS, hS = self.engine.view.geometry[2:4]
 
             if self.graphicMenu and self.menuBackground:
                 #volshebnyi - better menu scaling
-                self.engine.drawImage(self.menuBackground, scale = (1.0,-1.0), coord = (wS/2,hS/2), stretched = 3)
+                self.engine.drawImage(self.menuBackground, scale = (1.0,-1.0), coord = (wS/2,hS/2), stretched = FULL_SCREEN)
             else:
                 glEnable(GL_BLEND)
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -418,7 +417,7 @@ class Menu(Layer, KeyListener):
                     ypos = float(i+self.viewOffset)
                     self.engine.drawImage(self.menuText, scale = (.5*self.menuScale,(-1.0/n*self.menuScale)),
                                           coord = (wS*self.menux,(hS*self.menuy)-(hS*self.vSpace)*i),
-                                          rect = (xpos[0],xpos[1],ypos/n,(ypos+1.0)/n), stretched = 11)
+                                          rect = (xpos[0],xpos[1],ypos/n,(ypos+1.0)/n), stretched = KEEP_ASPECT | FIT_WIDTH)
                 else:
                     text = choice.getText(i + self.viewOffset == self.currentIndex)
                     glPushMatrix()

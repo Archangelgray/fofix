@@ -28,9 +28,12 @@
 
 #altered by myfingershurt to adapt to Alarian mod
 
-from Song import Note, Tempo
+from Song import Note
 from Neck import Neck
 from Shader import shaders
+import os
+import numpy as np
+from Mesh import Mesh
 
 from OpenGL.GL import *
 import math
@@ -53,7 +56,7 @@ import Log
 # to enable it, only here and Player.drums should need changing.
 
 
-from Instrument import *
+from Instrument import Instrument
 
 class Drum(Instrument):
     def __init__(self, engine, playerObj, editorMode = False, player = 0):

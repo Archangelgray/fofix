@@ -70,14 +70,12 @@ def valign(value, default='middle'):
         Log.warn('Invalid vertical alignment value - defaulting to %s' % default)
         return valign(default)
 
-
 class Theme(Task):
 
     def __getattr__(self, attr):
         try: #getting to this function is kinda slow. Set it on the first get to keep renders from lagging.
             object.__getattribute__(self, '__dict__')[attr] = defaultDict[attr]
-            if Config.get("game", "log_undefined_gets") == 1:
-                Log.debug("No theme variable for %s - Loading default..." % attr)
+            Log.debug("No theme variable for %s - Loading default..." % attr)
             return object.__getattribute__(self, attr)
         except KeyError:
             if attr in classNames.keys():
@@ -114,7 +112,7 @@ class Theme(Task):
             if self.config:
                 if self.config.has_option("theme", value):
                     if type == bool:
-                        return self.config.get("theme", value).lower() in ["1", "true", "yes", "on"]
+                        return isTrue(self.config.get("theme", value).lower())
                     elif type == "color":
                         return self.hexToColor(self.config.get("theme", value))
                     else:
@@ -779,22 +777,6 @@ class Theme(Task):
             retval = tuple(type(n.strip()) for n in vals)
         return retval
 
-    def fadeScreen(self, v):
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glEnable(GL_COLOR_MATERIAL)
-
-        glBegin(GL_TRIANGLE_STRIP)
-        glColor4f(0, 0, 0, .3 - v * .3)
-        glVertex2f(0, 0)
-        glColor4f(0, 0, 0, .3 - v * .3)
-        glVertex2f(1, 0)
-        glColor4f(0, 0, 0, .9 - v * .9)
-        glVertex2f(0, 1)
-        glColor4f(0, 0, 0, .9 - v * .9)
-        glVertex2f(1, 1)
-        glEnd()
-
     def loadThemeModule(self, moduleName):
         try:
             fp, pathname, description = imp.find_module(moduleName,[self.path])
@@ -884,9 +866,9 @@ class ThemeLobby:
             else:
                 glColor3f(*self.theme.lobbyHeaderColor)
             if i == lobby.keyControl and lobby.img_keyboard_panel:
-                lobby.drawImage(lobby.img_keyboard_panel, scale = (self.theme.lobbyPanelSize[0], -self.theme.lobbyPanelSize[1]), coord = (wP*.5+w*x,hP*.5+h*y), stretched = 3)
+                lobby.drawImage(lobby.img_keyboard_panel, scale = (self.theme.lobbyPanelSize[0], -self.theme.lobbyPanelSize[1]), coord = (wP*.5+w*x,hP*.5+h*y), stretched = FULL_SCREEN)
             elif lobby.img_panel:
-                lobby.drawImage(lobby.img_panel, scale = (self.theme.lobbyPanelSize[0], -self.theme.lobbyPanelSize[1]), coord = (wP*.5+w*x,hP*.5+h*y), stretched = 3)
+                lobby.drawImage(lobby.img_panel, scale = (self.theme.lobbyPanelSize[0], -self.theme.lobbyPanelSize[1]), coord = (wP*.5+w*x,hP*.5+h*y), stretched = FULL_SCREEN)
             if i == lobby.keyControl and lobby.img_keyboard:
                 lobby.drawImage(lobby.img_keyboard, scale = (self.theme.lobbyKeyboardImgScale, -self.theme.lobbyKeyboardImgScale), coord = (wP*self.theme.lobbyKeyboardImgPos[0]+w*x, hP*self.theme.lobbyKeyboardImgPos[1]+h*y))
             controlFont.render(lobby.controls[j], (self.theme.lobbyPanelSize[0]*self.theme.lobbyControlPos[0]+x, self.theme.lobbyPanelSize[1]*self.theme.lobbyControlPos[1]+y), scale = self.theme.lobbyControlScale, align = self.theme.lobbyControlAlign, new = True)
@@ -945,7 +927,7 @@ class ThemeParts:
         wP = w*self.theme.partDiffPanelSize[0]
         hP = h*self.theme.partDiffPanelSize[1]
         glColor3f(*self.theme.partDiffHeaderColor)
-        self.theme.fadeScreen(-2.00)
+        dialog.engine.fadeScreen(-2.00)
         if self.theme.partDiffTitleText:
             dialog.fontDict[self.theme.partDiffTitleTextFont].render(self.theme.partDiffTitleText, self.theme.partDiffTitleTextPos, scale = self.theme.partDiffTitleTextScale, align = self.theme.partDiffTitleTextAlign)
         if self.theme.partDiffSubtitleText:
@@ -954,9 +936,9 @@ class ThemeParts:
             glColor3f(*self.theme.partDiffHeaderColor)
             dialog.fontDict[self.theme.partDiffGameModeFont].render(dialog.gameModeText, self.theme.partDiffGameModePos, scale = self.theme.partDiffGameModeScale, align = self.theme.partDiffGameModeAlign)
             if i == dialog.keyControl and dialog.img_keyboard_panel:
-                dialog.drawImage(dialog.img_keyboard_panel, scale = (self.theme.partDiffPanelSize[0], -self.theme.partDiffPanelSize[1]), coord = (wP*.5+w*x,hP*.5+h*y), stretched = 3)
+                dialog.drawImage(dialog.img_keyboard_panel, scale = (self.theme.partDiffPanelSize[0], -self.theme.partDiffPanelSize[1]), coord = (wP*.5+w*x,hP*.5+h*y), stretched = FULL_SCREEN)
             elif dialog.img_panel:
-                dialog.drawImage(dialog.img_panel, scale = (self.theme.partDiffPanelSize[0], -self.theme.partDiffPanelSize[1]), coord = (wP*.5+w*x,hP*.5+h*y), stretched = 3)
+                dialog.drawImage(dialog.img_panel, scale = (self.theme.partDiffPanelSize[0], -self.theme.partDiffPanelSize[1]), coord = (wP*.5+w*x,hP*.5+h*y), stretched = FULL_SCREEN)
             if i == dialog.keyControl and dialog.img_keyboard:
                 dialog.drawImage(dialog.img_keyboard, scale = (self.theme.partDiffKeyboardImgScale, -self.theme.partDiffKeyboardImgScale), coord = (wP*self.theme.partDiffKeyboardImgPos[0]+w*x, hP*self.theme.partDiffKeyboardImgPos[1]+h*y))
             controlFont.render(dialog.players[i].name, (self.theme.partDiffPanelSize[0]*self.theme.partDiffControlPos[0]+x, self.theme.partDiffPanelSize[1]*self.theme.partDiffControlPos[1]+y), scale = self.theme.partDiffControlScale, align = self.theme.partDiffControlAlign, new = True)
@@ -2146,13 +2128,13 @@ class Setlist:
                 font.render(_("Loading Preview..."), (.05, .7), scale = 0.001)
             return
         if scene.img_list_button_guide:
-            scene.drawImage(scene.img_list_button_guide, scale = (.5, -.5), coord = (w*.5,0), fit = 2)
+            scene.drawImage(scene.img_list_button_guide, scale = (.5, -.5), coord = (w*.5,0), fit = BOTTOM)
         if scene.songLoader:
             font.render(_("Loading Preview..."), (.5, .7), align = 1)
         if scene.searching:
             font.render(scene.searchText, (.5, .7), align = 1)
         if scene.img_list_fg:
-            scene.drawImage(scene.img_list_fg, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = 3)
+            scene.drawImage(scene.img_list_fg, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
     def renderSelectedInfo(self, scene):
         if self.setlist_type == 0: #note... clean this up. this was a rush job.
@@ -2476,12 +2458,12 @@ class Setlist:
         y = 0
         w, h = scene.geometry
         font = scene.fontDict['songListFont']
-        self.theme.fadeScreen(0.25)
+        scene.engine.fadeScreen(0.25)
         if scene.moreInfoTime < 500:
             y = 1.0-(float(scene.moreInfoTime)/500.0)
         yI = y*h
         if scene.img_panel:
-            scene.drawImage(scene.img_panel, scale = (1.0, -1.0), coord = (w*.5,h*.5+yI), stretched = 3)
+            scene.drawImage(scene.img_panel, scale = (1.0, -1.0), coord = (w*.5,h*.5+yI), stretched = FULL_SCREEN)
         if scene.img_tabs:
             r0 = (0, (1.0/3.0), 0, .5)
             r1 = ((1.0/3.0),(2.0/3.0), 0, .5)

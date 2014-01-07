@@ -27,6 +27,8 @@ from distutils.core import setup, Extension
 import distutils.ccompiler
 from distutils.dep_util import newer
 from Cython.Distutils import build_ext as _build_ext
+from distutils.command.install import install as _install
+from distutils.cmd import Command
 import sys, SceneFactory, Version, glob, os
 import numpy as np
 import shlex
@@ -60,12 +62,12 @@ if os.name == 'nt':
           'windows': [
             {
               "script":          "FoFiX.py",
-              "icon_resources":  [(1, "fofix.ico")],
+              "icon_resources":  [(1, "../win32/fofix.ico")],
               "other_resources": [(RT_VERSION, 1, VersionResource(
                 #stump: the parameter below must consist only of up to four numerical fields separated by dots
                 Version.versionNum(),
                 file_description="Frets on Fire X",
-                legal_copyright=r"© 2008-2011 FoFiX Team.  GNU GPL v2 or later.",
+                legal_copyright=r"© 2008-2013 FoFiX Team.  GNU GPL v2 or later.",
                 company_name="FoFiX Team",
                 internal_name="FoFiX.exe",
                 original_filename="FoFiX.exe",
@@ -142,7 +144,6 @@ common_options = {
     "bz2",
     "email",
     "calendar",
-    "difflib",
     "doctest",
     "ftplib",
     "getpass",
@@ -188,7 +189,7 @@ options['py2app'].update({
   'plist': {
     'CFBundleIdentifier': 'org.pythonmac.FoFiX.FretsonFire',
     'CFBundleSignature': 'FoFX',
-    'NSHumanReadableCopyright': u"\xa9 2008-2011 FoFiX Team.  GNU GPL v2 or later.",
+    'NSHumanReadableCopyright': u"\xa9 2008-2013 FoFiX Team.  GNU GPL v2 or later.",
   }
 })
 
@@ -245,20 +246,34 @@ def grab_stdout(*args, **kw):
     return stdout
 
 
-def pc_info(pkg):
+# Blacklist MinGW-specific dependency libraries on Windows.
+if os.name == 'nt':
+    lib_blacklist = ['m', 'mingw32']
+else:
+    lib_blacklist = []
+
+
+def pc_info(pkg, altnames=[]):
     '''Obtain build options for a library from pkg-config and
     return a dict that can be expanded into the argument list for
     L{distutils.core.Extension}.'''
 
     print 'checking for library %s...' % pkg,
     if not pc_exists(pkg):
-        print 'not found'
-        print >>sys.stderr, 'Could not find required library "%s".' % pkg
-        if os.name == 'nt':
-            print >>sys.stderr, '(Check that you have the latest version of the dependency pack installed.)'
+        for name in altnames:
+            if pc_exists(name):
+                pkg = name
+                print '(using alternative name %s)' % pkg,
+                break
         else:
-            print >>sys.stderr, '(Check that you have the appropriate development package installed.)'
-        sys.exit(1)
+            print 'not found'
+            print >>sys.stderr, 'Could not find required library "%s".' % pkg
+            print >>sys.stderr, '(Also tried the following alternative names: %s)' % ', '.join(altnames)
+            if os.name == 'nt':
+                print >>sys.stderr, '(Check that you have the latest version of the dependency pack installed.)'
+            else:
+                print >>sys.stderr, '(Check that you have the appropriate development package installed.)'
+            sys.exit(1)
 
     cflags = shlex.split(grab_stdout([pkg_config, '--cflags', pkg]))
     libs = shlex.split(grab_stdout([pkg_config, '--libs', pkg]))
@@ -273,7 +288,7 @@ def pc_info(pkg):
     info = {
       'define_macros': [def_split(x[2:]) for x in cflags if x[:2] == '-D'],
       'include_dirs': [x[2:] for x in cflags if x[:2] == '-I'],
-      'libraries': [x[2:] for x in libs if x[:2] == '-l'],
+      'libraries': [x[2:] for x in libs if x[:2] == '-l' and x[2:] not in lib_blacklist],
       'library_dirs': [x[2:] for x in libs if x[:2] == '-L'],
     }
 
@@ -282,17 +297,27 @@ def pc_info(pkg):
 
 
 ogg_info = pc_info('ogg')
+vorbisfile_info = pc_info('vorbisfile')
+sdl_info = pc_info('sdl')
+sdl_mixer_info = pc_info('SDL_mixer')
 theoradec_info = pc_info('theoradec')
 glib_info = pc_info('glib-2.0')
+gthread_info = pc_info('gthread-2.0')
 swscale_info = pc_info('libswscale')
+soundtouch_info = pc_info('soundtouch', ['soundtouch-1.4', 'soundtouch-1.0'])
 if os.name == 'nt':
     # Windows systems: we just know what the OpenGL library is.
     gl_info = {'libraries': ['opengl32']}
     # And glib needs a slight hack to work correctly.
     glib_info['define_macros'].append(('inline', '__inline'))
+    # And we use the prebuilt soundtouch-c.
+    soundtouch_info['libraries'].append('soundtouch-c')
+    extra_soundtouch_src = []
 else:
     # Other systems: we ask pkg-config.
     gl_info = pc_info('gl')
+    # And build our own soundtouch-c.
+    extra_soundtouch_src = ['MixStream/soundtouch-c.cpp']
 # Build a similar info record for the numpy headers.
 numpy_info = {'include_dirs': [np.get_include()]}
 
@@ -335,6 +360,67 @@ class build_ext(_build_ext):
 
         return _build_ext.run(self, *args, **kw)
 
+    def build_extension(self, ext):
+        # If we're using MSVC, specify C++ exception handling behavior to avoid compiler warnings.
+        if self.compiler.compiler_type == 'msvc':
+            ext.extra_compile_args.append('/EHsc')
+
+        return _build_ext.build_extension(self, ext)
+
+
+# Make "setup.py install" do nothing until we configure something more sensible.
+class install(_install):
+    def run(self, *args, **kw):
+        print >>sys.stderr, 'This is not the correct way to install FoFiX.'
+        sys.exit(1)
+
+
+# Convert .po files into .mo files.
+class msgfmt(Command):
+    user_options = []
+    description = 'convert .po files in data/po into .mo files in data/translations'
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        msgfmt_cmd = find_command('msgfmt')
+        for pofile in glob.glob(os.path.join('..', 'data', 'po', '*.po')):
+            mofile = os.path.join('..', 'data', 'translations', os.path.basename(pofile)[:-3]+'.mo')
+            if newer(pofile, mofile):
+                self.mkpath(os.path.dirname(mofile))
+                self.spawn([msgfmt_cmd, '-c', '-o', mofile, pofile])
+
+
+# Extract translatable strings.
+class xgettext(Command):
+    user_options = []
+    description = 'extract translatable strings from source code'
+
+    # The function names that indicate a translatable string.
+    FUNCNAMES = ['_', 'N_']
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        xgettext_cmd = find_command('xgettext')
+        potfile = os.path.join('..', 'data', 'po', 'messages.pot')
+        self.spawn([xgettext_cmd,
+          '--package-name='+Version.PROGRAM_NAME,
+          '--package-version='+Version.version(),
+          '--copyright-holder=FoFiX Team',
+          '-o', potfile] +
+         ['-k' + funcname for funcname in self.FUNCNAMES] +
+          glob.glob('*.py'))
+
+
 # Add the common arguments to setup().
 # This includes arguments to cause FoFiX's extension modules to be built.
 setup_args.update({
@@ -345,10 +431,15 @@ setup_args.update({
               language='c++',
               sources=['pypitch/_pypitch.pyx', 'pypitch/pitch.cpp',
                        'pypitch/AnalyzerInput.cpp']),
-    Extension('VideoPlayer', ['VideoPlayer.pyx', 'VideoPlayerCore.c'],
-              **combine_info(gl_info, ogg_info, theoradec_info, glib_info, swscale_info))
+    Extension('VideoPlayer._VideoPlayer',
+              ['VideoPlayer/_VideoPlayer.pyx', 'VideoPlayer/VideoPlayer.c'],
+              **combine_info(gl_info, ogg_info, theoradec_info, glib_info, swscale_info,
+              {'include_dirs': ['.']})),
+    Extension('MixStream._MixStream',
+              ['MixStream/_MixStream.pyx', 'MixStream/MixStream.c', 'MixStream/vorbis.c'] + extra_soundtouch_src,
+              **combine_info(vorbisfile_info, soundtouch_info, glib_info, gthread_info, sdl_info, sdl_mixer_info)),
   ],
-  'cmdclass': {'build_ext': build_ext},
+  'cmdclass': {'build_ext': build_ext, 'install': install, 'msgfmt': msgfmt, 'xgettext': xgettext},
 })
 
 # If we're on Windows, add the dependency directory to the PATH so py2exe will

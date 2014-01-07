@@ -38,10 +38,11 @@ from Language import _
 import Version
 import Player
 import Config
-import Dialogs
 import Log
 
 from VideoPlayer import VideoLayer, VideoPlayerError
+
+from constants import *
 
 class Element:
     """A basic element in the credits scroller."""
@@ -214,9 +215,6 @@ class Credits(Layer, KeyListener):
           Text(nf, ns, c2, "right",  "Illusoft Collada module 0.3.159"),
           Text(nf, bs, c2, "right",  "http://colladablender.illusoft.com"),
           space,
-          Text(nf, ns, c2, "right",  "Psyco specializing compiler"),
-          Text(nf, bs, c2, "right",  "http://psyco.sourceforge.net"),
-          space,
           Text(nf, ns, c2, "right",  "MXM Python Midi Package 0.1.4"),
           Text(nf, bs, c2, "right",  "http://www.mxm.dk/products/public/pythonmidi"),
           space,
@@ -226,7 +224,7 @@ class Credits(Layer, KeyListener):
           space,
           space,
           Text(nf, bs, c1, "center", _("Copyright 2006, 2007 by Unreal Voodoo")),
-          Text(nf, bs, c1, "center", _("Copyright 2008-2011 by Team FoFiX")),
+          Text(nf, bs, c1, "center", _("Copyright 2008-2013 by Team FoFiX")),
           space,
           space
         ])
@@ -359,9 +357,9 @@ class Credits(Layer, KeyListener):
 
         with self.engine.view.orthogonalProjection(normalize = True):
             if self.background:
-                self.engine.drawImage(self.background, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
+                self.engine.drawImage(self.background, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
             else:
-                Dialogs.fadeScreen(.4)
+                self.engine.fadeScreen(.4)
             self.doneList = []
 
             # render the scroller elements

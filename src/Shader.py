@@ -38,6 +38,8 @@ from OpenGL.GL.ARB.fragment_shader import *
 from OpenGL.GL.ARB.multitexture import *
 from OpenGL.GL.EXT.texture3D import *
 
+from constants import isTrue
+
 class ShaderCompilationError(Exception):
     pass
 
@@ -483,45 +485,26 @@ class ShaderList:
         else:
             self.turnon = False
 
-
         if self.turnon:
             for i in self.shaders.keys():
-                value = Config.get("video","shader_"+i)
-                if value != "None":
-                    if value == "theme":
-                        if Config.get("theme","shader_"+i) == "True":
-                            value = i
-                        else:
-                            continue
-                    self.assigned[i] = value
+                try:
+                    value = Config.get("video","shader_"+i)
+                    if value != "None":
+                        if value == "theme":
+                            if isTrue(Config.get("theme","shader_"+i).lower()):
+                                value = i
+                            else:
+                                continue
+                        self.assigned[i] = value
+                except KeyError:
+                    continue
             return True
         return False
-
+        
     def defineConfig(self):
         for name in self.shaders.keys():
             for key in self[name].keys():
                 Config.define("shader", name+"_"+key,  str, "None")
-
-    def loadFromIni(self):
-        for name in self.shaders.keys():
-            for key in self[name].keys():
-                value = Config.get("theme",name+"_"+key)
-                if value != "None":
-                    if value == "True": value = True
-                    elif value == "False": value = False
-                    else:
-                        value = value.split(",")
-                        for i in range(len(value)):
-                            value[i] = float(value[i])
-                        if len(value) == 1: value = value[0]
-                        else: value = tuple(value)
-                    if key == "enabled":
-                        if Config.get("video","shader_"+name) == 2:
-                            self[name][key] = value
-                    else:
-                        if len(self[name][key]) == 2:
-                            self[name][key][1] = value
-
 
     def set(self, dir):
         """Do all shader setup.

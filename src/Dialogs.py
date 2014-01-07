@@ -40,9 +40,9 @@ from View import Layer, BackgroundLayer
 from Input import KeyListener
 from Menu import Menu
 from Language import _
-from Player import GUITARTYPES, DRUMTYPES, MICTYPES
 import Log
 import Player
+from Unicode import unicodify
 
 #stump: vocals
 import Microphone
@@ -51,6 +51,8 @@ import Microphone
 from Credits import Credits
 
 import Config
+
+from constants import *
 
 #MFH - for loading phrases
 def wrapCenteredText(font, pos, text, rightMargin = 1.0, scale = 0.002, visibility = 0.0, linespace = 1.0, allowshadowoffset = False, shadowoffset = (.0022, .0005)):
@@ -132,26 +134,6 @@ def wrapText(font, pos, text, rightMargin = 0.9, scale = 0.002, visibility = 0.0
             x += w + space
     return (x - space, y)
 
-def fadeScreen(v):
-    """
-    Fade the screen to a dark color to make whatever is on top easier to read.
-
-    @param v: Visibility factor [0..1], 0 is fully visible
-    """
-    glEnable(GL_BLEND)
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-    glEnable(GL_COLOR_MATERIAL)
-
-    glBegin(GL_TRIANGLE_STRIP)
-    glColor4f(0, 0, 0, .3 - v * .3)
-    glVertex2f(0, 0)
-    glColor4f(0, 0, 0, .3 - v * .3)
-    glVertex2f(1, 0)
-    glColor4f(0, 0, 0, .9 - v * .9)
-    glVertex2f(0, 1)
-    glColor4f(0, 0, 0, .9 - v * .9)
-    glVertex2f(1, 1)
-    glEnd()
 
 class MainDialog(Layer, KeyListener):
     def __init__(self, engine):
@@ -284,7 +266,7 @@ class GetText(Layer, KeyListener):
         with self.engine.view.orthogonalProjection(normalize = True):
             v = (1 - visibility) ** 2
 
-            fadeScreen(v)
+            self.engine.fadeScreen(v)
             self.engine.theme.setBaseColor(1 - v)
 
             if (self.time % 10) < 5 and visibility > .9:
@@ -358,7 +340,7 @@ class GetKey(Layer, KeyListener):
         with self.engine.view.orthogonalProjection(normalize = True):
             v = (1 - visibility) ** 2
 
-            fadeScreen(v)
+            self.engine.fadeScreen(v)
             self.engine.theme.setBaseColor(1 - v)
 
             pos = wrapText(font, (.1, .33 - v), self.prompt)
@@ -417,7 +399,7 @@ class LoadingScreen(Layer, KeyListener):
 
         with self.engine.view.orthogonalProjection(normalize = True):
             v = (1 - visibility) ** 2
-            fadeScreen(v)
+            self.engine.fadeScreen(v)
 
             w, h = self.engine.view.geometry[2:4]
             self.loadingImg = self.engine.data.loadingImage
@@ -425,7 +407,7 @@ class LoadingScreen(Layer, KeyListener):
             #MFH - auto-scaling of loading screen
             #Volshebnyi - fit to screen applied
             if self.loadingImg:
-                self.engine.drawImage(self.loadingImg, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
+                self.engine.drawImage(self.loadingImg, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
             self.engine.theme.setBaseColor(1 - v)
             w, h = font.getStringSize(self.text)
@@ -487,7 +469,7 @@ class MessageScreen(Layer, KeyListener):
 
         with self.engine.view.orthogonalProjection(normalize = True):
             v = (1 - visibility) ** 2
-            fadeScreen(v)
+            self.engine.fadeScreen(v)
 
             x = .1
             y = .3 + v * 2
@@ -504,7 +486,7 @@ class FileChooser(BackgroundLayer, KeyListener):
     """File choosing layer."""
     def __init__(self, engine, masks, path, prompt = "", dirSelect = False):
         self.masks          = masks
-        self.path           = path
+        self.path           = unicodify(path)
         self.prompt         = prompt
         self.engine         = engine
         self.accepted       = False
@@ -518,7 +500,6 @@ class FileChooser(BackgroundLayer, KeyListener):
 
 
         self.dirSelect      = dirSelect
-        self.spinnyDisabled = self.engine.config.get("game", "disable_spinny")
 
         #Get theme
         #now theme determination logic is only in data.py:
@@ -544,7 +525,7 @@ class FileChooser(BackgroundLayer, KeyListener):
         return fileName
 
     def getFiles(self):
-        files = [".."]
+        files = [u".."]
         for fn in os.listdir(self.path):
             if fn.startswith("."): continue
             f = os.path.join(self.path, fn)
@@ -565,17 +546,17 @@ class FileChooser(BackgroundLayer, KeyListener):
         driveLetters=[]
         for drive in string.letters[len(string.letters) / 2:]:
             if win32file.GetDriveType(drive + ":") == win32file.DRIVE_FIXED:
-                driveLetters.append(drive + ":\\")
+                driveLetters.append(drive + u":\\")
         return driveLetters
 
     def updateFiles(self):
         if self.menu:
             self.engine.view.popLayer(self.menu)
 
-        if self.path == "toplevel" and os.name != "nt":
-            self.path = "/"
+        if self.path == u"toplevel" and os.name != "nt":
+            self.path = u"/"
 
-        if self.path == "toplevel":
+        if self.path == u"toplevel":
             self.menu = Menu(self.engine, choices = [(self._getFileText(f), self._getFileCallback(f)) for f in self.getDisks()], onClose = self.close, onCancel = self.cancel)
         else:
             self.menu = Menu(self.engine, choices = [(self._getFileText(f), self._getFileCallback(f)) for f in self.getFiles()], onClose = self.close, onCancel = self.cancel)
@@ -591,14 +572,14 @@ class FileChooser(BackgroundLayer, KeyListener):
                     self.menu = None
                     return
 
-        if self.path == "toplevel":
-            self.path = ""
+        if self.path == u"toplevel":
+            self.path = u""
         path = os.path.abspath(os.path.join(self.path, fileName))
 
         if os.path.isdir(path):
 
-            if path == self.path and fileName == "..":
-                self.path = "toplevel"
+            if path == self.path and fileName == u"..":
+                self.path = u"toplevel"
             else:
                 self.path = path
             self.updateFiles()
@@ -637,12 +618,12 @@ class FileChooser(BackgroundLayer, KeyListener):
         #MFH - draw neck black BG in for transparent areas (covers options BG):
         if self.neckBlackBack != None:
             #MFH - auto background scaling
-            self.engine.drawImage(self.neckBlackBack, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
+            self.engine.drawImage(self.neckBlackBack, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
 
         #MFH - auto background scaling
         if self.engine.data.optionsBG:
-            self.engine.drawImage(self.engine.data.optionsBG, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
+            self.engine.drawImage(self.engine.data.optionsBG, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
 
         font = self.engine.data.font
@@ -821,7 +802,7 @@ class NeckChooser(Layer, KeyListener):
         #MFH - draw neck black BG in for transparent necks (covers options BG):
         if self.neckBlackBack != None:
             #MFH - auto background scaling
-            self.engine.drawImage(self.neckBlackBack, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
+            self.engine.drawImage(self.neckBlackBack, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
         currentNeck = self.necks[int(self.selectedNeck)+2]
         lastNeck1 = self.necks[int(self.selectedNeck)]
@@ -900,7 +881,7 @@ class NeckChooser(Layer, KeyListener):
 
         #MFH - draw neck BG on top of necks
         #MFH - auto background scaling
-        self.engine.drawImage(self.neckBG, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
+        self.engine.drawImage(self.neckBG, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
 
         font = self.engine.data.font
@@ -1111,9 +1092,9 @@ class AvatarChooser(Layer, KeyListener):
 
         with self.engine.view.orthogonalProjection(normalize = True):
             if self.background:
-                self.engine.drawImage(self.background, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = 3)
+                self.engine.drawImage(self.background, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
             else:
-                fadeScreen(v)
+                self.engine.fadeScreen(v)
             self.engine.theme.setBaseColor(1 - v)
             if len(self.avatars) > 1:
                 lastAv2i  = (int(self.selectedAv)-2) % len(self.avatars)
@@ -1359,7 +1340,7 @@ class PartDiffChooser(MainDialog):
 
         with self.engine.view.orthogonalProjection(normalize = True):
             if self.img_background:
-                self.engine.drawImage(self.img_background, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = 3)
+                self.engine.drawImage(self.img_background, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
             self.theme.partDiff.renderPanels(self)
 
 class ItemChooser(BackgroundLayer, KeyListener):
@@ -1391,7 +1372,6 @@ class ItemChooser(BackgroundLayer, KeyListener):
             self.posX = .1    #MFH - default
             self.posY = .05   #MFH - default
             self.menu = Menu(self.engine, choices = [(c, self._callbackForItem(c)) for c in items], onClose = self.close, onCancel = self.cancel, font = self.engine.data.streakFont2)
-        self.spinnyDisabled = self.engine.config.get("game", "disable_spinny")
 
         if selected and selected in items:
             self.menu.selectItem(items.index(selected))
@@ -1435,7 +1415,7 @@ class ItemChooser(BackgroundLayer, KeyListener):
 
         #MFH - auto background scaling
         if self.engine.data.optionsBG:
-            self.engine.drawImage(self.engine.data.optionsBG, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = 3)
+            self.engine.drawImage(self.engine.data.optionsBG, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
         with self.engine.view.orthogonalProjection(normalize = True):
             glEnable(GL_BLEND)
@@ -1637,7 +1617,7 @@ class KeyTester(Layer, KeyListener):
             else:
                 rotateArrow = None
 
-            fadeScreen(v)
+            self.engine.fadeScreen(v)
 
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -1703,8 +1683,8 @@ class KeyTester(Layer, KeyListener):
                         glColor3f(.4, .4, .4)
                     font.render(text, (.25-wText/2, .45 + v))
                     starC = (1-self.starpower)*.5*w*self.analogBarScale
-                    self.engine.drawImage(self.analogBar, scale = (self.analogBarScale*self.starpower, -self.analogBarScale), coord = ((w*.25)-starC, h*.3), rect = (0, self.starpower, 0, 1), stretched = 11)
-                    self.engine.drawImage(self.analogBox, scale = (self.analogBoxScale, -self.analogBoxScale), coord = (w*.25, h*.3), stretched = 11)
+                    self.engine.drawImage(self.analogBar, scale = (self.analogBarScale*self.starpower, -self.analogBarScale), coord = ((w*.25)-starC, h*.3), rect = (0, self.starpower, 0, 1), stretched = KEEP_ASPECT | FIT_WIDTH)
+                    self.engine.drawImage(self.analogBox, scale = (self.analogBoxScale, -self.analogBoxScale), coord = (w*.25, h*.3), stretched = KEEP_ASPECT | FIT_WIDTH)
                 else:
                     if self.controls.getState(self.keyList[Player.STAR]):
                         self.engine.theme.setSelectedColor(1 - v)
@@ -1783,7 +1763,7 @@ class KeyTester(Layer, KeyListener):
                         glColor3f(.4, .4, .4)
                     font.render(self.names[Player.KILL], (.75-wText/2, .45 + v))
                     whammyC = (1-self.whammy)*.5*w*self.analogBarScale
-                    self.engine.drawImage(self.analogBar, scale = (self.analogBarScale*self.whammy, -self.analogBarScale), coord = (w*.75-whammyC, h*.3), rect = (0, self.whammy, 0, 1), stretched = 11)
+                    self.engine.drawImage(self.analogBar, scale = (self.analogBarScale*self.whammy, -self.analogBarScale), coord = (w*.75-whammyC, h*.3), rect = (0, self.whammy, 0, 1), stretched = KEEP_ASPECT | FIT_WIDTH)
                 else:
                     if self.controls.getState(self.keyList[Player.KILL]):
                         self.engine.theme.setSelectedColor(1 - v)
@@ -1791,7 +1771,7 @@ class KeyTester(Layer, KeyListener):
                         glColor3f(.4, .4, .4)
                     font.render(self.names[Player.KILL], (.75-wText/2, .45 + v))
 
-                self.engine.drawImage(self.analogBox, scale = (self.analogBoxScale, -self.analogBoxScale), coord = (w*.75, h*.3), stretched = 11)
+                self.engine.drawImage(self.analogBox, scale = (self.analogBoxScale, -self.analogBoxScale), coord = (w*.75, h*.3), stretched = KEEP_ASPECT | FIT_WIDTH)
                 if self.controls.getState(self.keyList[Player.ACTION1]) or self.controls.getState(self.keyList[Player.ACTION2]):
                     self.engine.theme.setSelectedColor(1 - v)
                 else:
@@ -1909,7 +1889,7 @@ def getKey(engine, prompt, key = None, specialKeyList = []):
     _runDialog(engine, d)
     return d.key
 
-def chooseFile(engine, masks = ["*.*"], path = ".", prompt = _("Choose a File"), dirSelect = False):
+def chooseFile(engine, masks = ["*.*"], path = u".", prompt = _("Choose a File"), dirSelect = False):
     """
     Ask the user to select a file.
 
@@ -2065,10 +2045,10 @@ class LoadingSplashScreen(Layer, KeyListener):
 
         with self.engine.view.orthogonalProjection(normalize = True):
             v = (1 - visibility) ** 2
-            fadeScreen(v)
+            self.engine.fadeScreen(v)
             w, h = self.engine.view.geometry[2:4]
             if self.loadingImg:
-                self.engine.drawImage(self.loadingImg, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
+                self.engine.drawImage(self.loadingImg, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
             self.engine.theme.setBaseColor(1 - v)
             w, h = font.getStringSize(self.text, scale=self.fScale)
@@ -2105,12 +2085,13 @@ class SongLoadingSplashScreen(LoadingSplashScreen):
 
         with self.engine.view.orthogonalProjection(normalize = True):
             v = (1 - visibility) ** 2
-            fadeScreen(v)
+            self.engine.fadeScreen(v)
             w, h = self.engine.view.geometry[2:4]
 
             self.engine.theme.setBaseColor(1 - v)
-            self.engine.drawImage(self.songBack, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
-            self.engine.drawImage(self.loadingImg, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = 3)
+            if self.songBack:
+                self.engine.drawImage(self.songBack, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
+            self.engine.drawImage(self.loadingImg, scale = (1.0,-1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
             w, h = font.getStringSize(self.text, scale=self.fScale)
 
             x = self.loadingx

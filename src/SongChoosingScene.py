@@ -24,7 +24,7 @@
 
 from __future__ import with_statement
 
-from Scene import Scene, SuppressScene
+from Scene import Scene
 import os
 import time
 import Player
@@ -42,6 +42,8 @@ from Texture import Texture
 
 import Log    #MFH
 
+from constants import *
+
 PRACTICE = 1
 CAREER = 2
 
@@ -58,14 +60,9 @@ class SongChoosingScene(Scene):
     def __init__(self, engine, libraryName = None, songName = None):
         Scene.__init__(self, engine)
 
-        if self.engine.world.sceneName == "SongChoosingScene":  #MFH - dual / triple loading cycle fix
-            Log.warn("Extra SongChoosingScene was instantiated, but detected and shut down.  Cause unknown.")
-            raise SuppressScene  #stump
-        else:
-            self.engine.world.sceneName = "SongChoosingScene"
+        self.engine.world.sceneName = "SongChoosingScene"
 
-        if self.engine.config.get("debug", "use_new_song_database"):
-            Song.updateSongDatabase(self.engine)
+        Song.updateSongDatabase(self.engine)
 
         self.wizardStarted = False
         self.libraryName   = libraryName
@@ -947,20 +944,20 @@ class SongChoosingScene(Scene):
 
         #render the background (including the header and footer)
         if self.setlistStyle == 1 and self.img_list_bg:
-            self.engine.drawImage(self.img_list_bg, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = 11)
+            self.engine.drawImage(self.img_list_bg, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = KEEP_ASPECT | FIT_WIDTH)
         elif self.img_list_bg:
-            self.engine.drawImage(self.img_list_bg, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = 3)
+            self.engine.drawImage(self.img_list_bg, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
         if self.img_list_head:
             o = 0
             if self.setlistStyle == 1:
                 o = self.yPos
-            self.engine.drawImage(self.img_list_head, scale = (1.0, -1.0), coord = (w/2,h+o), stretched = 11, fit = 1)
+            self.engine.drawImage(self.img_list_head, scale = (1.0, -1.0), coord = (w/2,h+o), stretched = KEEP_ASPECT | FIT_WIDTH, fit = TOP)
         if self.setlistStyle in [0, 2] and self.img_list_foot:
-            self.engine.drawImage(self.img_list_foot, scale = (1.0, -1.0), coord = (w/2,0), stretched = 11, fit = 2)
+            self.engine.drawImage(self.img_list_foot, scale = (1.0, -1.0), coord = (w/2,0), stretched = FULL_SCREEN, fit = BOTTOM)
         elif self.img_list_foot:
             maxPos = max(len(self.items) - self.itemsPerPage, 0)
             o = (-self.itemSize[1]*h*maxPos) + self.yPos
-            self.engine.drawImage(self.img_list_foot, scale = (1.0, -1.0), coord = (w/2,o), stretched = 11, fit = 2)
+            self.engine.drawImage(self.img_list_foot, scale = (1.0, -1.0), coord = (w/2,o), stretched = KEEP_ASPECT | FIT_WIDTH, fit = BOTTOM)
 
         self.engine.theme.setlist.renderHeader(self)
 
@@ -1005,7 +1002,7 @@ class SongChoosingScene(Scene):
             w, h = self.engine.view.geometry[2:4]
 
             if self.img_background:
-                self.engine.drawImage(self.img_background, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = 3)
+                self.engine.drawImage(self.img_background, scale = (1.0, -1.0), coord = (w/2,h/2), stretched = FULL_SCREEN)
 
             if self.mode == 0:
                 self.renderSetlist(visibility, topMost)

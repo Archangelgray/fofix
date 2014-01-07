@@ -28,7 +28,6 @@ import Audio
 import Config
 import os
 import re
-import math
 import random
 import hashlib
 import binascii
@@ -40,6 +39,7 @@ import copy
 import cPickle  #stump: Cerealizer and sqlite3 don't seem to like each other that much...
 from Language import _
 import VFS
+from Unicode import utf8
 
 DEFAULT_BPM = 120.0
 DEFAULT_LIBRARY         = "songs"
@@ -351,11 +351,7 @@ class SongInfo(object):
     def _set(self, attr, value):
         if not self.info.has_section("song"):
             self.info.add_section("song")
-        if type(value) == unicode:
-            value = value.encode(Config.encoding)
-        else:
-            value = str(value)
-        self.info.set("song", attr, value)
+        self.info.set("song", attr, utf8(value))
 
     def getObfuscatedScores(self, part = parts[GUITAR_PART]):
         s = {}
@@ -737,11 +733,7 @@ class LibraryInfo(object):
     def _set(self, attr, value):
         if not self.info.has_section("library"):
             self.info.add_section("library")
-        if type(value) == unicode:
-            value = value.encode(Config.encoding)
-        else:
-            value = str(value)
-        self.info.set("library", attr, value)
+        self.info.set("library", attr, utf8(value))
 
     def save(self):
         if os.access(os.path.dirname(self.fileName), os.W_OK) == True:
@@ -780,51 +772,17 @@ class LibraryInfo(object):
 
 class BlankSpaceInfo(object): #MFH
     def __init__(self, nameToDisplay = ""):
-        self.nameToDisplay = nameToDisplay
 
         self.logClassInits = Config.get("game", "log_class_inits")
         if self.logClassInits == 1:
             Log.debug("BlankSpaceInfo class init (song.py)...")
 
+        self.name = nameToDisplay
+        self.color = None
         self.artist = None    #MFH - prevents search errors
-
-    def _set(self, attr, value):
-        if type(value) == unicode:
-            value = value.encode(Config.encoding)
-        else:
-            value = str(value)
-        self.info.set(self.section, attr, value)
-
-    def _get(self, attr, type = None, default = ""):
-        try:
-            v = self.info.get(self.section, attr)
-        except:
-            v = default
-        if v is not None and type:
-            v = type(v)
-        return v
-
-    def getName(self):
-        return self.nameToDisplay
-
-    def setName(self, value):
-        self._set("name", value)
-
-    def getColor(self):
-        c = self._get("color")
-        if c:
-            return Theme.Theme.hexToColor(c)
-
-    def setColor(self, color):
-        self._set("color", Theme.Theme.colorToHex(color))
 
     def getUnlockID(self):
         return ""
-
-
-    name          = property(getName, setName)
-    color         = property(getColor, setColor)
-
 
 
 class CareerResetterInfo(object): #MFH
@@ -834,40 +792,9 @@ class CareerResetterInfo(object): #MFH
         if self.logClassInits == 1:
             Log.debug("CareerResetterInfo class init (song.py)...")
 
+        self.name = _("Reset Career")
+        self.color = None
         self.artist = None    #MFH - prevents search errors
-
-    def _set(self, attr, value):
-        if type(value) == unicode:
-            value = value.encode(Config.encoding)
-        else:
-            value = str(value)
-        self.info.set(self.section, attr, value)
-
-    def _get(self, attr, type = None, default = ""):
-        try:
-            v = self.info.get(self.section, attr)
-        except:
-            v = default
-        if v is not None and type:
-            v = type(v)
-        return v
-
-    def getName(self):
-        return _("Reset Career")
-
-    def setName(self, value):
-        self._set("name", value)
-
-    def getColor(self):
-        c = self._get("color")
-        if c:
-            return Theme.Theme.hexToColor(c)
-
-    def setColor(self, color):
-        self._set("color", Theme.Theme.colorToHex(color))
-
-    name          = property(getName, setName)
-    color         = property(getColor, setColor)
 
 
 class RandomSongInfo(object): #MFH
@@ -876,40 +803,9 @@ class RandomSongInfo(object): #MFH
         if self.logClassInits == 1:
             Log.debug("RandomSongInfo class init (song.py)...")
 
+        self.name = _("   (Random Song)")
+        self.color = None
         self.artist = None    #MFH - prevents search errors
-
-    def _set(self, attr, value):
-        if type(value) == unicode:
-            value = value.encode(Config.encoding)
-        else:
-            value = str(value)
-        self.info.set(self.section, attr, value)
-
-    def _get(self, attr, type = None, default = ""):
-        try:
-            v = self.info.get(self.section, attr)
-        except:
-            v = default
-        if v is not None and type:
-            v = type(v)
-        return v
-
-    def getName(self):
-        return _("   (Random Song)")
-
-    def setName(self, value):
-        self._set("name", value)
-
-    def getColor(self):
-        c = self._get("color")
-        if c:
-            return Theme.Theme.hexToColor(c)
-
-    def setColor(self, color):
-        self._set("color", Theme.Theme.colorToHex(color))
-
-    name          = property(getName, setName)
-    color         = property(getColor, setColor)
 
 
 #coolguy567's unlock system
@@ -925,11 +821,7 @@ class TitleInfo(object):
         self.artist = None    #MFH - prevents search errors
 
     def _set(self, attr, value):
-        if type(value) == unicode:
-            value = value.encode(Config.encoding)
-        else:
-            value = str(value)
-        self.info.set(self.section, attr, value)
+        self.info.set(self.section, attr, utf8(value))
 
     def _get(self, attr, type = None, default = ""):
         try:
@@ -964,49 +856,16 @@ class TitleInfo(object):
 class SortTitleInfo(object):
     def __init__(self, nameToDisplay):
 
-        self.nameToDisplay = nameToDisplay
-
         self.logClassInits = Config.get("game", "log_class_inits")
         if self.logClassInits == 1:
             Log.debug("TitleInfo class init (song.py)...")
 
+        self.name = nameToDisplay
+        self.color = None
         self.artist = None    #MFH - prevents search errors
 
-    def _set(self, attr, value):
-        if type(value) == unicode:
-            value = value.encode(Config.encoding)
-        else:
-            value = str(value)
-        self.info.set(self.section, attr, value)
-
-    def _get(self, attr, type = None, default = ""):
-        try:
-            v = self.info.get(self.section, attr)
-        except:
-            v = default
-        if v is not None and type:
-            v = type(v)
-        return v
-
-    def getName(self):
-        return self.nameToDisplay
-
-    def setName(self, value):
-        self._set("name", value)
-
-    def getColor(self):
-        c = self._get("color")
-        if c:
-            return Theme.Theme.hexToColor(c)
-
-    def setColor(self, color):
-        self._set("color", Theme.Theme.colorToHex(color))
-
     def getUnlockID(self):
-        return self.nameToDisplay
-
-    name          = property(getName, setName)
-    color         = property(getColor, setColor)
+        return self.name
 
 
 class Event:
@@ -2215,11 +2074,7 @@ class Song(object):
 
         self.breMarkerTime = None
 
-        self.music = None
-
-        if songTrackName:
-            self.music       = Audio.Music(songTrackName)
-
+        self.songTrack = None
         self.guitarTrack = None
         self.rhythmTrack = None
 
@@ -2229,34 +2084,40 @@ class Song(object):
         self.crowdTrack = None
 
         try:
+            if songTrackName:
+                self.songTrack = Audio.StreamingSound(self.engine.audio.getChannel(0), songTrackName)
+        except Exception, e:
+            Log.warn("Unable to load song track: %s" % e)
+
+        try:
             if guitarTrackName:
-                self.guitarTrack = Audio.StreamingSound(self.engine, self.engine.audio.getChannel(1), guitarTrackName)
+                self.guitarTrack = Audio.StreamingSound(self.engine.audio.getChannel(1), guitarTrackName)
         except Exception, e:
             Log.warn("Unable to load guitar track: %s" % e)
 
         try:
             if rhythmTrackName:
-                self.rhythmTrack = Audio.StreamingSound(self.engine, self.engine.audio.getChannel(2), rhythmTrackName)
+                self.rhythmTrack = Audio.StreamingSound(self.engine.audio.getChannel(2), rhythmTrackName)
         except Exception, e:
             Log.warn("Unable to load rhythm track: %s" % e)
 
 
         try:
             if drumTrackName:
-                self.drumTrack = Audio.StreamingSound(self.engine, self.engine.audio.getChannel(3), drumTrackName)
+                self.drumTrack = Audio.StreamingSound(self.engine.audio.getChannel(3), drumTrackName)
         except Exception, e:
             Log.warn("Unable to load drum track: %s" % e)
 
         try:
             if crowdTrackName:
-                self.crowdTrack = Audio.StreamingSound(self.engine, self.engine.audio.getChannel(4), crowdTrackName)
+                self.crowdTrack = Audio.StreamingSound(self.engine.audio.getChannel(4), crowdTrackName)
         except Exception, e:
             Log.warn("Unable to load crowd track: %s" % e)
 
         #MFH - single audio track song detection
         self.singleTrackSong = False
-        if (self.music == None) or (self.guitarTrack == None and self.rhythmTrack == None and self.drumTrack == None):
-            if not (self.music == None and self.guitarTrack == None and self.rhythmTrack == None and self.drumTrack == None):
+        if (self.songTrack == None) or (self.guitarTrack == None and self.rhythmTrack == None and self.drumTrack == None):
+            if not (self.songTrack == None and self.guitarTrack == None and self.rhythmTrack == None and self.drumTrack == None):
                 self.singleTrackSong = True
                 self.missVolume = self.engine.config.get("audio", "single_track_miss_volume")   #MFH - force single-track miss volume setting instead
                 Log.debug("Song with only a single audio track identified - single-track miss volume applied: " + str(self.missVolume))
@@ -2272,6 +2133,10 @@ class Song(object):
         if scriptFileName and os.path.isfile(scriptFileName):
             scriptReader = ScriptReader(self, open(scriptFileName))
             scriptReader.read()
+
+        # set playback speed
+        if self.engine.audioSpeedFactor != 1.0:
+            self.setSpeed(self.engine.audioSpeedFactor)
 
     @property
     def length(self):
@@ -2324,15 +2189,12 @@ class Song(object):
 
         #RF-mod No longer needed?
 
-        if self.engine.audioSpeedFactor == 1:  #MFH - shut this track up if slowing audio down!
-            self.music.play(0, start / 1000.0)
-            if self.singleTrackSong:
-                self.music.setVolume(self.activeVolume)
-            else:
-                self.music.setVolume(self.backVolume)
+        self.songTrack.setPosition(start / 1000.0)
+        self.songTrack.play()
+        if self.singleTrackSong:
+            self.songTrack.setVolume(self.activeVolume)
         else:
-            self.music.play(int(math.ceil(1.0/self.engine.audioSpeedFactor)), start / 1000.0)  #tell music to loop 2 times for 1/2 speed, 4 times for 1/4 speed (so it doesn't end early) (it wants an int, though)
-            self.music.setVolume(0.0)
+            self.songTrack.setVolume(self.backVolume)
 
         if self.guitarTrack:
             assert start == 0.0
@@ -2350,11 +2212,9 @@ class Song(object):
         self._playing = True
 
     def pause(self):
-        self.music.pause()
         self.engine.audio.pause()
 
     def unpause(self):
-        self.music.unpause()
         self.engine.audio.unpause()
 
     def setInstrumentVolume(self, volume, part):
@@ -2382,14 +2242,14 @@ class Song(object):
         # evilynux - It also falls on this with buggy pygame < 1.9 on 64bit CPUs.
         else:
             if volume == 0:
-                self.music.setVolume(self.missVolume)
+                self.songTrack.setVolume(self.missVolume)
             elif volume == 1:
                 if GUITAR_TRACK in self.activeAudioTracks or self.singleTrackSong:
-                    self.music.setVolume(self.activeVolume)
+                    self.songTrack.setVolume(self.activeVolume)
                 else:
-                    self.music.setVolume(self.backVolume)
+                    self.songTrack.setVolume(self.backVolume)
             else:
-                self.music.setVolume(volume)
+                self.songTrack.setVolume(volume)
 
     def setRhythmVolume(self, volume):
         if self.rhythmTrack:
@@ -2415,38 +2275,26 @@ class Song(object):
             else:
                 self.drumTrack.setVolume(volume)
 
-    #stump: pitch bending
-    def setInstrumentPitch(self, pitch, part):
+    def setInstrumentPitch(self, semitones, part):
         if part == parts[GUITAR_PART]:
             if self.guitarTrack:
-                self.guitarTrack.setPitchBend(pitch)
+                self.guitarTrack.setPitchBendSemitones(semitones)
             else:
-                self.music.setPitchBend(pitch)
+                self.songTrack.setPitchBendSemitones(semitones)
         elif part == parts[DRUM_PART]:
             pass
         else:
             if self.rhythmTrack:
-                self.rhythmTrack.setPitchBend(pitch)
+                self.rhythmTrack.setPitchBendSemitones(semitones)
 
     def resetInstrumentPitch(self, part):
-        if part == -1: #this is just a convenient way to ensure we grab the 'music' channel when resetting pitch (rather; reset bending on all output)
-            self.music.stopPitchBend()
-        elif part == parts[GUITAR_PART]:
-            if self.guitarTrack:
-                self.guitarTrack.stopPitchBend()
-            else:
-                self.music.stopPitchBend()
-        elif part == parts[DRUM_PART]:
-            pass
-        else:
-            if self.rhythmTrack:
-                self.rhythmTrack.stopPitchBend()
+        self.setInstrumentPitch(0.0, part)
 
     def setBackgroundVolume(self, volume):
         if volume == 1:
-            self.music.setVolume(self.backVolume)
+            self.songTrack.setVolume(self.backVolume)
         else:
-            self.music.setVolume(volume)
+            self.songTrack.setVolume(volume)
 
     def setCrowdVolume(self, volume):
         if self.crowdTrack:
@@ -2473,10 +2321,8 @@ class Song(object):
                     track.reset()
 
 
-        if self.music:  #MFH
-            self.music.stop()
-            self.music.rewind()
-
+        if self.songTrack:
+            self.songTrack.stop()
         if self.guitarTrack:
             self.guitarTrack.stop()
         if self.rhythmTrack:
@@ -2487,12 +2333,25 @@ class Song(object):
             self.crowdTrack.stop()
         self._playing = False
 
+    def setSpeed(self, speed):
+        if self.songTrack:
+            self.songTrack.setSpeed(speed)
+        if self.guitarTrack:
+            self.guitarTrack.setSpeed(speed)
+        if self.rhythmTrack:
+            self.rhythmTrack.setSpeed(speed)
+        if self.drumTrack:
+            self.drumTrack.setSpeed(speed)
+        if self.crowdTrack:
+            self.crowdTrack.setSpeed(speed)
+
     def fadeout(self, time):
         for tracks in self.tracks:
             for track in tracks:
                 track.reset()
 
-        self.music.fadeout(time)
+        if self.songTrack:
+            self.songTrack.fadeout(time)
         if self.guitarTrack:
             self.guitarTrack.fadeout(time)
         if self.rhythmTrack:
@@ -2503,40 +2362,18 @@ class Song(object):
             self.crowdTrack.fadeout(time)
         self._playing = False
 
-    def clearPause(self):
-        self.music.isPause = False
-        self.music.toUnpause = False
-        self.music.pausePos = 0.0
-
     def getPosition(self):
-        if not (self._playing and Audio.Audio().isMixerInit()):
+        if not self._playing:
             pos = 0.0
         else:
-            pos = self.music.getPosition()
-
-
-            if self.engine.audioSpeedFactor != 1:   #MFH - to correct for slowdown's positioning
-                #pos /= self.engine.audioSpeedFactor
-                pos *= self.engine.audioSpeedFactor
+            pos = self.songTrack.getPosition() * 1000.0
 
         if pos < 0.0:
             pos = 0.0
-        return pos + self.start - self.delay
+        return pos - self.delay
 
     def isPlaying(self):
-        #MFH - check here to see if any audio tracks are still playing first!
-        #MFH from the Future sez: but only if in slowdown mode!
-        if self.engine.audioSpeedFactor == 1:
-            return self._playing and self.music.isPlaying()
-        else:   #altered speed mode!
-            if self.guitarTrack and self.guitarTrack.streamIsPlaying() > 0:
-                return True
-            if self.rhythmTrack and self.rhythmTrack.streamIsPlaying() > 0:
-                return True
-            if self.drumTrack and self.drumTrack.streamIsPlaying() > 0:
-                return True
-            else:
-                return self._playing and self.music.isPlaying()
+        return self._playing and self.songTrack.isPlaying()
 
     def getBeat(self):
         return self.getPosition() / self.period
@@ -2673,7 +2510,6 @@ class MidiReader(midi.MidiOutStream):
 
         self.logSections = Config.get("game", "log_sections")
 
-        self.readTextAndLyricEvents = Config.get("game","rock_band_events")
         self.guitarSoloIndex = 0
         self.guitarSoloActive = False
         self.guitarSoloSectionMarkers = False
@@ -2921,110 +2757,107 @@ class MidiReader(midi.MidiOutStream):
     #to find these markers and count the notes and add a new text event containing each solo's note count
     def text(self, text):
         if text.find("GNMIDI") < 0:   #to filter out the midi class illegal usage / trial timeout messages
-            if self.readTextAndLyricEvents > 0:
+            #MFH - if sequence name is PART VOCALS then look for text event lyrics
+            if self.vocalTrack:
+                if text.find("[") < 0:    #not a marker
+                    event = TextEvent(text, 400.0)
+                    self.addVocalLyric(text)
+                    self.song.hasMidiLyrics = True
+                    self.song.eventTracks[TK_LYRICS].addEvent(self.abs_time(), event)  #MFH - add an event to the lyrics track
 
-                #MFH - if sequence name is PART VOCALS then look for text event lyrics
-                if self.vocalTrack:
-                    if text.find("[") < 0:    #not a marker
-                        event = TextEvent(text, 400.0)
-                        self.addVocalLyric(text)
-                        self.song.hasMidiLyrics = True
-                        self.song.eventTracks[TK_LYRICS].addEvent(self.abs_time(), event)  #MFH - add an event to the lyrics track
-
-                else:
+            else:
 
 
 
-                    unusedEvent = None
-                    event = None
-                    gSoloEvent = False
-                    #also convert all underscores to spaces so it look better
-                    text = text.replace("_"," ")
-                    if text.lower().find("section") >= 0:
-                        self.guitarSoloSectionMarkers = True      #GH1 dont use section markers... GH2+ do
-                        #strip unnecessary text / chars:
-                        text = text.replace("section","")
-                        text = text.replace("[","")
-                        text = text.replace("]","")
-                        #also convert "gtr" to "Guitar"
-                        text = text.replace("gtr","Guitar")
-                        event = TextEvent(text, 250.0)
-                        if text.lower().find("big rock ending") >= 0:
-                            curTime = self.abs_time()
-                            Log.debug("Big Rock Ending section event marker found at " + str(curTime) )
-                            self.song.breMarkerTime = curTime
-
-                        if text.lower().find("solo") >= 0 and text.lower().find("drum") < 0 and text.lower().find("outro") < 0 and text.lower().find("organ") < 0 and text.lower().find("synth") < 0 and text.lower().find("bass") < 0 and text.lower().find("harmonica") < 0:
-                            gSoloEvent = True
-                            gSolo = True
-                        elif text.lower().find("guitar") >= 0 and text.lower().find("lead") >= 0:    #Foreplay Long Time "[section_gtr_lead_1]"
-                            gSoloEvent = True
-                            gSolo = True
-                        elif text.lower().find("guitar") >= 0 and text.lower().find("line") >= 0:   #support for REM Orange Crush style solos
-                            gSoloEvent = True
-                            gSolo = True
-                        elif text.lower().find("guitar") >= 0 and text.lower().find("ostinato") >= 0:   #support for Pleasure solos "[section gtr_ostinato]"
-                            gSoloEvent = True
-                            gSolo = True
-                        else: #this is the cue to end solos...
-                            gSoloEvent = True
-                            gSolo = False
-                    elif text.lower().find("solo") >= 0 and text.find("[") < 0 and text.lower().find("drum") < 0 and text.lower().find("map") < 0 and text.lower().find("play") < 0 and not self.guitarSoloSectionMarkers:
-                        event = TextEvent(text, 250.0)
-                        gSoloEvent = True
-                        if text.lower().find("off") >= 0:
-                            gSolo = False
-                        else:
-                            gSolo = True
-                    elif (text.lower().find("verse") >= 0 or text.lower().find("chorus") >= 0) and text.find("[") < 0 and not self.guitarSoloSectionMarkers:   #this is an alternate GH1-style solo end marker
-                        event = TextEvent(text, 250.0)
-                        gSoloEvent = True
-                        gSolo = False
-                    elif text.lower().find("gtr") >= 0 and text.lower().find("off") >= 0 and text.find("[") < 0 and not self.guitarSoloSectionMarkers:   #this is an alternate GH1-style solo end marker
-                        #also convert "gtr" to "Guitar"
-                        text = text.replace("gtr","Guitar")
-                        event = TextEvent(text, 100.0)
-                        gSoloEvent = True
-                        gSolo = False
-                    else:  #unused text event
-                        unusedEvent = TextEvent(text, 100.0)
-                    #now, check for guitar solo status change:
-                    if gSoloEvent:
-                        if gSolo:
-                            if not self.guitarSoloActive:
-                                self.guitarSoloActive = True
-                                soloEvent = TextEvent("GSOLO ON", 250.0)
-                                Log.debug("GSOLO ON event " + event.text + " found at time " + str(self.abs_time()) )
-                                self.song.eventTracks[TK_GUITAR_SOLOS].addEvent(self.abs_time(), soloEvent)  #MFH - add an event to the guitar solos track
-                        else: #this is the cue to end solos...
-                            if self.guitarSoloActive:
-                                #MFH - here, check to make sure we're not ending a guitar solo that has just started!!
-                                curTime = self.abs_time()
-                                if self.song.eventTracks[TK_GUITAR_SOLOS][-1][0] < curTime:
-                                    self.guitarSoloActive = False
-                                    soloEvent = TextEvent("GSOLO OFF", 250.0)
-                                    Log.debug("GSOLO OFF event " + event.text + " found at time " + str(curTime) )
-                                    self.guitarSoloIndex += 1
-                                    self.song.eventTracks[TK_GUITAR_SOLOS].addEvent(curTime, soloEvent)  #MFH - add an event to the guitar solos track
-
-                    if event:
+                unusedEvent = None
+                event = None
+                gSoloEvent = False
+                #also convert all underscores to spaces so it look better
+                text = text.replace("_"," ")
+                if text.lower().find("section") >= 0:
+                    self.guitarSoloSectionMarkers = True      #GH1 dont use section markers... GH2+ do
+                    #strip unnecessary text / chars:
+                    text = text.replace("section","")
+                    text = text.replace("[","")
+                    text = text.replace("]","")
+                    #also convert "gtr" to "Guitar"
+                    text = text.replace("gtr","Guitar")
+                    event = TextEvent(text, 250.0)
+                    if text.lower().find("big rock ending") >= 0:
                         curTime = self.abs_time()
-                        if len(self.song.eventTracks[TK_SECTIONS]) <= 1:
+                        Log.debug("Big Rock Ending section event marker found at " + str(curTime) )
+                        self.song.breMarkerTime = curTime
+
+                    if text.lower().find("solo") >= 0 and text.lower().find("drum") < 0 and text.lower().find("outro") < 0 and text.lower().find("organ") < 0 and text.lower().find("synth") < 0 and text.lower().find("bass") < 0 and text.lower().find("harmonica") < 0:
+                        gSoloEvent = True
+                        gSolo = True
+                    elif text.lower().find("guitar") >= 0 and text.lower().find("lead") >= 0:    #Foreplay Long Time "[section_gtr_lead_1]"
+                        gSoloEvent = True
+                        gSolo = True
+                    elif text.lower().find("guitar") >= 0 and text.lower().find("line") >= 0:   #support for REM Orange Crush style solos
+                        gSoloEvent = True
+                        gSolo = True
+                    elif text.lower().find("guitar") >= 0 and text.lower().find("ostinato") >= 0:   #support for Pleasure solos "[section gtr_ostinato]"
+                        gSoloEvent = True
+                        gSolo = True
+                    else: #this is the cue to end solos...
+                        gSoloEvent = True
+                        gSolo = False
+                elif text.lower().find("solo") >= 0 and text.find("[") < 0 and text.lower().find("drum") < 0 and text.lower().find("map") < 0 and text.lower().find("play") < 0 and not self.guitarSoloSectionMarkers:
+                    event = TextEvent(text, 250.0)
+                    gSoloEvent = True
+                    if text.lower().find("off") >= 0:
+                        gSolo = False
+                    else:
+                        gSolo = True
+                elif (text.lower().find("verse") >= 0 or text.lower().find("chorus") >= 0) and text.find("[") < 0 and not self.guitarSoloSectionMarkers:   #this is an alternate GH1-style solo end marker
+                    event = TextEvent(text, 250.0)
+                    gSoloEvent = True
+                    gSolo = False
+                elif text.lower().find("gtr") >= 0 and text.lower().find("off") >= 0 and text.find("[") < 0 and not self.guitarSoloSectionMarkers:   #this is an alternate GH1-style solo end marker
+                    #also convert "gtr" to "Guitar"
+                    text = text.replace("gtr","Guitar")
+                    event = TextEvent(text, 100.0)
+                    gSoloEvent = True
+                    gSolo = False
+                else:  #unused text event
+                    unusedEvent = TextEvent(text, 100.0)
+                #now, check for guitar solo status change:
+                if gSoloEvent:
+                    if gSolo:
+                        if not self.guitarSoloActive:
+                            self.guitarSoloActive = True
+                            soloEvent = TextEvent("GSOLO ON", 250.0)
+                            Log.debug("GSOLO ON event " + event.text + " found at time " + str(self.abs_time()) )
+                            self.song.eventTracks[TK_GUITAR_SOLOS].addEvent(self.abs_time(), soloEvent)  #MFH - add an event to the guitar solos track
+                    else: #this is the cue to end solos...
+                        if self.guitarSoloActive:
+                            #MFH - here, check to make sure we're not ending a guitar solo that has just started!!
+                            curTime = self.abs_time()
+                            if self.song.eventTracks[TK_GUITAR_SOLOS][-1][0] < curTime:
+                                self.guitarSoloActive = False
+                                soloEvent = TextEvent("GSOLO OFF", 250.0)
+                                Log.debug("GSOLO OFF event " + event.text + " found at time " + str(curTime) )
+                                self.guitarSoloIndex += 1
+                                self.song.eventTracks[TK_GUITAR_SOLOS].addEvent(curTime, soloEvent)  #MFH - add an event to the guitar solos track
+
+                if event:
+                    curTime = self.abs_time()
+                    if len(self.song.eventTracks[TK_SECTIONS]) <= 1:
+                        self.song.eventTracks[TK_SECTIONS].addEvent(curTime, event)  #MFH - add an event to the sections track
+                    elif len(self.song.eventTracks[TK_SECTIONS]) > 1:    #ensure it exists first
+                        if self.song.eventTracks[TK_SECTIONS][-1][0] < curTime: #ensure we're not adding two consecutive sections to the same location!
                             self.song.eventTracks[TK_SECTIONS].addEvent(curTime, event)  #MFH - add an event to the sections track
-                        elif len(self.song.eventTracks[TK_SECTIONS]) > 1:    #ensure it exists first
-                            if self.song.eventTracks[TK_SECTIONS][-1][0] < curTime: #ensure we're not adding two consecutive sections to the same location!
-                                self.song.eventTracks[TK_SECTIONS].addEvent(curTime, event)  #MFH - add an event to the sections track
-                    elif unusedEvent:
-                        self.song.eventTracks[TK_UNUSED_TEXT].addEvent(self.abs_time(), unusedEvent)  #MFH - add an event to the unused text track
+                elif unusedEvent:
+                    self.song.eventTracks[TK_UNUSED_TEXT].addEvent(self.abs_time(), unusedEvent)  #MFH - add an event to the unused text track
 
     #myfingershurt: adding MIDI lyric event access
     def lyric(self, text):
         if text.find("GNMIDI") < 0:   #to filter out the midi class illegal usage / trial timeout messages
-            if self.readTextAndLyricEvents > 0:
-                event = TextEvent(text, 400.0)
-                self.addVocalLyric(text)
-                self.song.hasMidiLyrics = True
-                self.song.eventTracks[TK_LYRICS].addEvent(self.abs_time(), event)  #MFH - add an event to the lyrics track
+            event = TextEvent(text, 400.0)
+            self.addVocalLyric(text)
+            self.song.hasMidiLyrics = True
+            self.song.eventTracks[TK_LYRICS].addEvent(self.abs_time(), event)  #MFH - add an event to the lyrics track
 
 class MidiSectionReader(midi.MidiOutStream):
     # We exit via this exception so that we don't need to read the whole file in
@@ -3354,7 +3187,7 @@ class MidiPartsDiffReader(midi.MidiOutStream):
 def loadSong(engine, name, library = DEFAULT_LIBRARY, seekable = False, playbackOnly = False, notesOnly = False, part = [parts[GUITAR_PART]], practiceMode = False, practiceSpeed = .5):
 
     Log.debug("loadSong function call (song.py)...")
-    crowdsEnabled = engine.config.get("audio", "crowd_tracks_enabled")
+    crowdsEnabled = engine.config.get("audio", "enable_crowd_tracks")
 
     #RF-mod (not needed?)
     guitarFile = engine.resource.fileName(library, name, "guitar.ogg")
@@ -3430,32 +3263,7 @@ def loadSong(engine, name, library = DEFAULT_LIBRARY, seekable = False, playback
         slowDownFactor = practiceSpeed
     else:
         slowDownFactor = engine.config.get("audio", "speed_factor")
-    engine.setSpeedFactor(slowDownFactor)    #MFH
-
-
-    #MFH - check for slowdown mode here.  If slowdown, and single track song (or practice mode),
-    #  duplicate single track to a streamingAudio track so the slowed down version can be heard.
-    if engine.audioSpeedFactor != 1:
-        crowdFile = None
-        #count tracks:
-        audioTrackCount = 0
-        if guitarFile:
-            audioTrackCount += 1
-        if rhythmFile:
-            audioTrackCount += 1
-        if drumFile:
-            audioTrackCount += 1
-        if audioTrackCount < 1:
-            if part[0] == parts[GUITAR_PART] or part[0] == parts[PRO_GUITAR_PART]:
-                guitarFile = songFile
-            elif part[0] == parts[BASS_PART]:
-                rhythmFile = songFile
-            elif part[0] == parts[DRUM_PART] or part[0] == parts[PRO_DRUM_PART]:
-                drumFile = songFile
-            else:
-                guitarFile = songFile
-
-
+    engine.audioSpeedFactor = slowDownFactor
 
 
     if playbackOnly:

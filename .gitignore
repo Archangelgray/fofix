@@ -1,8 +1,11 @@
 *.py[cod]
 *.so
 *.exe
+*.exe.log
 *.dll
 *.orig
+*.mo
+*.pot
 .project
 .pydevproject
 .settings
@@ -14,7 +17,8 @@ src/*.idb
 src/build
 src/pypitch/_pypitch.cpp
 src/cmgl.c
-src/VideoPlayer.c
+src/MixStream/_MixStream.c
+src/VideoPlayer/_VideoPlayer.c
 gstreamer/*
 data/library.zip
 data/users/players/*
@@ -31,3 +35,6 @@ data/themes/*
 win32/*
 !win32/*.sh
 !win32/*.py
+!win32/*.patch
+!win32/README.deppack.stub
+!win32/*.ico
