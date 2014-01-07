@@ -179,6 +179,7 @@ class Instrument(object):
     self.lastBpmChange  = -1.0
     self.baseBeat       = 0.0
 
+    self.camAngle = 0.0 #set from guitarScene
 
     self.indexFps       = self.engine.config.get("video", "fps")
 
@@ -262,11 +263,12 @@ class Instrument(object):
       self.freestyleEnabled = True
 
     #blazingamer
-    self.nstype = self.engine.config.get("game", "nstype")
-    self.twoDnote = self.engine.theme.twoDnote
-    self.twoDkeys = self.engine.theme.twoDkeys 
-    self.threeDspin = self.engine.theme.threeDspin 
-    self.noterotate = self.engine.config.get("coffee", "noterotate")
+    self.nstype = self.engine.config.get("game", "nstype")                  #neck style
+    self.twoDnote = self.engine.theme.twoDnote                              #note style (2D or 3D)
+    self.twoDkeys = self.engine.theme.twoDkeys                              #key style
+    self.threeDspin = self.engine.theme.threeDspin                          #3d notes spin when they are star power notes
+    self.noterotate = self.engine.config.get("coffee", "noterotate")        #adjust notes for if they were designed for FoF 1.1 or 1.2
+    self.billboardNote = self.engine.theme.billboardNote                    #3D notes follow the angle of the camera
 
     #MFH- fixing neck speed
     if self.nstype < 3:   #not constant mode: 
@@ -466,10 +468,10 @@ class Instrument(object):
         engine.loadImgDrawing(self, "noteButtons", get("notes.png"))
         
       size = (self.boardWidth/self.strings/2, self.boardWidth/self.strings/2)
-      self.noteVtx = np.array([[-size[0],  .27, size[1]],
-                               [size[0],  .27, size[1]],
-                               [-size[0], -.27, -size[1]],
-                               [size[0], -.27, -size[1]]], 
+      self.noteVtx = np.array([[-size[0],  0.0, size[1]],
+                               [size[0],  0.0, size[1]],
+                               [-size[0], 0.0, -size[1]],
+                               [size[0], 0.0, -size[1]]], 
                                dtype=np.float32)
 
       self.noteTexCoord = [[np.array([[i/float(self.strings), s/6.0],
@@ -909,7 +911,7 @@ class Instrument(object):
       if (event.played or event.hopod):
         if not self.disableFlameSFX:
           if self.isDrum:
-            if event.number == 4: #make the bass drum not render a flame
+            if event.number == 0: #make the bass drum not render a flame
               continue
 
             x  = (self.strings / 2 +.5 - event.number) * w
@@ -982,13 +984,10 @@ class Instrument(object):
         if not self.disableFlameSFX:
 
           if self.isDrum:
-            if event.number == 4: #make the bass drum not render a flame
+            if event.number == 0:
               continue
 
-            if event.number == 0: #correct for colors on the drums
-              flameColor = self.flameColors[4]
-            else:
-              flameColor = self.flameColors[event.number]
+            flameColor = self.flameColors[event.number]
 
             x  = (self.strings / 2 +.5 - event.number) * w
 
@@ -1072,6 +1071,8 @@ class Instrument(object):
 
   #group rendering of 2D notes into method
   def render3DNote(self, texture, model, color, isTappable):
+    if (self.billboardNote):
+      glRotatef(self.camAngle + 90, 1, 0, 0)
     if texture: 
       glColor3f(1,1,1)
       glEnable(GL_TEXTURE_2D)
@@ -1143,7 +1144,7 @@ class Instrument(object):
         y += 4
       if isTappable:
         y += 1
-        
+
       if self.noteSpin:
         texCoord = self.animatedNoteTexCoord[self.noteSpinFrameIndex][fret]
         if isTappable:
@@ -1168,7 +1169,7 @@ class Instrument(object):
         texCoord = self.noteTexCoord[y][fret]
           
       self.engine.draw3Dtex(noteImage, vertex = self.noteVtx, texcoord = texCoord,
-                            scale = (1,1,0), rot = (30,1,0,0), multiples = False, color = color)
+                            scale = (1,1,1), rot = (self.camAngle ,1,0,0), multiples = False, color = color)
 
     else: #3d Notes
       shaders.setVar("Material",color,"notes")

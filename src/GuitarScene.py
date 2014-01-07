@@ -55,6 +55,8 @@ import locale
 
 from OpenGL.GL import *
 
+from math import degrees, atan
+
 class GuitarScene(Scene):
   def __init__(self, engine, libraryName, songName):
     Scene.__init__(self, engine)
@@ -406,23 +408,6 @@ class GuitarScene(Scene):
     
     
     self.multi = [1 for i in self.playerList]
-    self.x1 = [0 for i in self.playerList]
-    self.y1 = [0 for i in self.playerList]
-    self.x2 = [0 for i in self.playerList]
-    self.y2 = [0 for i in self.playerList]
-    self.x3 = [0 for i in self.playerList]
-    self.y3 = [0 for i in self.playerList]
-    if self.coOpType:
-      self.x1.append(0)
-      self.y1.append(0)
-      self.x2.append(0)
-      self.y2.append(0)
-      self.x3.append(0)
-      self.y3.append(0)
-    
-
-    #MFH - precalculation variable definition
-
 
     #Get theme
     themename = self.engine.data.themeLabel
@@ -1717,7 +1702,7 @@ class GuitarScene(Scene):
       self.camera.target    = (self.camera.target[0], self.camera.target[1], self.camera.target[2]+self.boardZ-1)
       self.camera.origin    = (self.camera.origin[0], self.camera.origin[1], self.camera.origin[2]+self.boardZ-1)
     elif self.neckintroAnimationType == 3: #Off game starts with the pov as is
-	  self.camera.origin    = self.camera.origin
+      self.camera.origin    = self.camera.origin
     elif self.neckintroAnimationType == 4: #By Theme
       if self.neckintroThemeType == "fofix":
         self.camera.origin = (self.camera.origin[0], self.camera.origin[1]*self.boardY, self.camera.origin[2])
@@ -3110,10 +3095,6 @@ class GuitarScene(Scene):
       if not self.drumScoringEnabled:   #MFH - ignore when drum scoring is disabled
         return
 
-    if self.starNotesMissed[i] or self.instruments[i].isStarPhrase:
-      self.instruments[i].isStarPhrase = True
-      self.instruments[i].spEnabled = False
-
     if not self.failingEnabled or self.practiceMode:
       return
 
@@ -3494,6 +3475,8 @@ class GuitarScene(Scene):
         self.stage.run(pos, instrument.currentPeriod)
         playerNum = i
         guitar = instrument
+
+        instrument.camAngle = -degrees(atan(abs(self.camera.origin[2] - self.camera.target[2]) / abs(self.camera.origin[1] - self.camera.target[1])))
 
         self.checkBattleObjects(guitar, i)
       
