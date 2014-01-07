@@ -3251,9 +3251,9 @@ class GuitarScene(Scene):
                 if self.countdown > 0: #if the countdown is already at 0 ex. after pause
                     self.countdownOK = True
                     self.boardY = 1
-          elif self.boardY > 1:
-              self.boardY -= 0.01 #speed of animation higher the number = the faster the animation
-              self.setCamera()
+            elif self.boardY > 1:
+                self.boardY -= 0.01 #speed of animation higher the number = the faster the animation
+                self.setCamera()
         elif self.neckintroAnimationType == 1 or (self.neckintroAnimationType == 4 and self.neckintroThemeType == "guitar hero"): #Guitar Hero
             if self.boardY <= 1:
                 self.setCamera()

@@ -442,7 +442,7 @@ class Guitar(Instrument):
                     noteCount += 1
         return sorted(notes, key=lambda x: x[0])
 
-  def controlsMatchNotes(self, controls, notes, hopo = False):
+    def controlsMatchNotes(self, controls, notes, hopo = False):
         # no notes?
         if not notes:
             return False
@@ -498,13 +498,13 @@ class Guitar(Instrument):
         else:
             self.missedNotes = []
 
-    for time, note in self.missedNotes:
-        note.skipped = True
-        note.played = False
-        if twochord == 2:
-            self.twoChord += skipped
+        for time, note in self.missedNotes:
+            note.skipped = True
+            note.played = False
+            if twochord == 2:
+                self.twoChord += skipped
 
-        return True
+            return True
 
     def uniqify(self, seq, idfun=None):
         # order preserving
